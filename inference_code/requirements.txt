@@ -1,4 +1,7 @@
 metrics
-Pillow
-numpy>2
 matplotlib
+numpy>2
+Pillow
+torch
+torchvision
+scikit-learn
