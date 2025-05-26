@@ -1,3 +1,4 @@
+import csv
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -246,3 +247,11 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig("training_metrics.png")
 plt.show()
+
+
+# Save training metrics to CSV
+with open("training_log.csv", mode="w", newline="") as file:
+    writer = csv.writer(file)
+    writer.writerow(["Epoch", "Train Loss", "Validation Loss", "Pixel Accuracy", "Mean IoU"])
+    for i in range(EPOCHS):
+        writer.writerow([i+1, train_losses[i], val_losses[i], val_accuracies[i], val_mious[i]])
