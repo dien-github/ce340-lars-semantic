@@ -1,3 +1,6 @@
+import torch
+import torchvision
+
 def get_deeplab_model(num_classes, device):
     """
     Load the pre-trained DeepLabV3 model with MobileNetV3 backbone.

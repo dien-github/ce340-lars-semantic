@@ -33,11 +33,19 @@ val_dataset = LaRSDataset(
     target_size=config.input_size
 )
 
-train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=4)
-val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=4)
+train_loader = DataLoader(
+    train_dataset, 
+    batch_size=config.batch_size, 
+    shuffle=True, 
+    num_workers=4)
+val_loader = DataLoader(
+    val_dataset, 
+    batch_size=config.batch_size, 
+    shuffle=False, 
+    num_workers=4)
 
 # Model, loss function, optimizer
-model = get_deeplab_model(num_classes=config.num_classes)
+model = get_deeplab_model(num_classes=config.num_classes, device=config.device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
 
