@@ -1,0 +1,3 @@
+0: obstacles
+1: water
+2: sky
