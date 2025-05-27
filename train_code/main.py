@@ -91,7 +91,10 @@ for epoch in range(1, config.epochs + 1):
 
     if val_miou > best_miou:
         best_miou = val_miou
-        best_model_dir = os.path.dirname(config.best_model_path)
+        # best_model_dir = os.path.dirname(config.best_model_path)
+        best_model_name = config.base_model_name
+        best_model_path = config.best_model_path
+        best_model_dir = os.path.dirname(best_model_path)
         if not os.path.exists(best_model_dir) and best_model_dir: # Check if best_model_dir is not empty
             os.makedirs(best_model_dir, exist_ok=True)
             print(f"Created directory: {best_model_dir}")
@@ -99,6 +102,11 @@ for epoch in range(1, config.epochs + 1):
         print(f"Best model saved with mIoU: {best_miou:.4f}")
 
 # Save training metrics
+metrics_dir = os.path.dirname(config.metrics_path)
+if not os.path.exists(metrics_dir) and metrics_dir:
+    os.makedirs(metrics_dir, exist_ok=True)
+    print(f"Created metrics directory: {metrics_dir}")
+
 save_metrics_plot(
     epochs_range=range(1, config.epochs + 1),
     train_losses=train_losses,
