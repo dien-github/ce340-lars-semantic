@@ -177,6 +177,6 @@ cython_debug/
 LaRS_dataset/
 
 # Another
-ino.txt
+ino.md
 
 .vscode/

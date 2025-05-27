@@ -7,12 +7,17 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 import torch
 from torch.utils.data import DataLoader
 from torch import nn, optim
-import torch.cuda.amp as amp
+import torch.amp as amp
 import os
 import random
 import numpy as np
 
 config = Config()
+run_id = config.run_id  # Lấy mã run_id duy nhất cho lần train này
+base_model_name = f"best_model_{config.date_str}_{run_id}"
+best_model_path = f"checkpoints/train/{config.date_str}/{base_model_name}.pth"
+metrics_path = f"output/train/{config.date_str}/{base_model_name}_metrics.csv"
+plots_path = f"output/train/{config.date_str}/{base_model_name}_metrics.png"
 
 # Optional: Add set_seed function here or import from utils if you create one
 torch.manual_seed(config.seed)
@@ -91,32 +96,26 @@ for epoch in range(1, config.epochs + 1):
 
     if val_miou > best_miou:
         best_miou = val_miou
-        # best_model_dir = os.path.dirname(config.best_model_path)
-        best_model_name = config.base_model_name
-        best_model_path = config.best_model_path
         best_model_dir = os.path.dirname(best_model_path)
-        if not os.path.exists(best_model_dir) and best_model_dir: # Check if best_model_dir is not empty
+        if not os.path.exists(best_model_dir):
             os.makedirs(best_model_dir, exist_ok=True)
-            print(f"Created directory: {best_model_dir}")
-        torch.save(model.state_dict(), config.best_model_path)
-        print(f"Best model saved with mIoU: {best_miou:.4f}")
+        torch.save(model.state_dict(), best_model_path)
+        print(f"Best model saved: {best_model_path} with mIoU: {best_miou:.4f}")
 
 # Save training metrics
-metrics_dir = os.path.dirname(config.metrics_path)
-if not os.path.exists(metrics_dir) and metrics_dir:
+metrics_dir = os.path.dirname(metrics_path)
+if not os.path.exists(metrics_dir):
     os.makedirs(metrics_dir, exist_ok=True)
-    print(f"Created metrics directory: {metrics_dir}")
-
 save_metrics_plot(
     epochs_range=range(1, config.epochs + 1),
     train_losses=train_losses,
     val_losses=val_losses,
     val_accuracies=val_accuracies,
     val_mious=val_mious,
-    plot_path=config.plots_path
+    plot_path=plots_path
 )
 save_metrics_to_csv(
-    metrics_path=config.metrics_path,
+    metrics_path=metrics_path,
     train_losses=train_losses,
     val_losses=val_losses,
     val_accuracies=val_accuracies,

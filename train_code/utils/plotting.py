@@ -41,4 +41,9 @@ def save_metrics_to_csv(metrics_path, train_losses, val_losses, val_accuracies, 
         writer = csv.writer(csvfile)
         writer.writerow(['Epoch', 'Train Loss', 'Validation Loss', 'Validation Accuracy', 'mIoU'])
         for epoch in range(len(train_losses)):
-            writer.writerow([epoch + 1, train_losses[epoch], val_losses[epoch], val_accuracies[epoch], val_mious[epoch]])
+            writer.writerow([
+                epoch + 1,
+                train_losses[epoch],
+                val_losses[epoch],
+                val_accuracies[epoch],
+                val_mious[epoch]])
