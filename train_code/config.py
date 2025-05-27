@@ -7,8 +7,8 @@ class Config:
     seed = 2025
     num_classes = 3
     batch_size = 32
-    epochs = 10
-    learning_rate = 1e-5
+    epochs = 20
+    learning_rate = 1e-4
     input_size = (320, 320)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cudnn_benchmark = True # Set to True for speed if input sizes are fixed
@@ -16,7 +16,7 @@ class Config:
     dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
     date_str = datetime.now().strftime("%Y%m%d")
 
-    load_checkpoint_path = "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
+    load_checkpoint_path = None # "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
 
     @property
     def run_id(self):

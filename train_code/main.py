@@ -88,6 +88,7 @@ if hasattr(torch, 'compile') and device_obj.type == 'cuda':
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.1)
 scaler = amp.GradScaler(enabled=(device_obj.type == 'cuda'))
 
 # Train loop
@@ -96,6 +97,7 @@ best_miou = 0.0
 for epoch in range(1, config.epochs + 1):
     train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device_obj, scaler, epoch)
     val_accuracy, val_miou, val_loss = validate(model, val_loader, criterion, device_obj, config.num_classes, epoch)
+    scheduler.step(val_loss)  # Adjust learning rate based on validation loss
 
     train_losses.append(train_loss)
     val_losses.append(val_loss)
