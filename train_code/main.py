@@ -70,6 +70,14 @@ print(f"Validation dataset size: {len(val_dataset)}")
 device_obj = torch.device(config.device)
 model = get_deeplab_model(num_classes=config.num_classes, device=device_obj)
 
+if hasattr(config, 'load_checkpoint_path') and config.load_checkpoint_path:
+    print(f"Loading model from checkpoint: {config.load_checkpoint_path}")
+    if os.path.exists(config.load_checkpoint_path):
+        model.load_state_dict(torch.load(config.load_checkpoint_path, map_location=device_obj))
+        print("Model loaded successfully.")
+    else:
+        print(f"Checkpoint not found: {config.load_checkpoint_path}. Starting training from scratch.")
+
 if hasattr(torch, 'compile') and device_obj.type == 'cuda':
     print("Attempting to compile the model with torch.compile()...")
     try:

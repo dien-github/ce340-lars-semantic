@@ -6,15 +6,17 @@ from datetime import datetime
 class Config:
     seed = 2025
     num_classes = 3
-    batch_size = 16
+    batch_size = 32
     epochs = 10
-    learning_rate = 1e-4
+    learning_rate = 1e-5
     input_size = (320, 320)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cudnn_benchmark = True # Set to True for speed if input sizes are fixed
 
     dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
     date_str = datetime.now().strftime("%Y%m%d")
+
+    load_checkpoint_path = "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
 
     @property
     def run_id(self):
