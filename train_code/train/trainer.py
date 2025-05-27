@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import numpy as np
 import torch
-import torch.cuda.amp as amp
+import torch.amp as amp
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epoch):
     model.train()
@@ -12,7 +12,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         images, masks = images.to(device), masks.to(device)
         optimizer.zero_grad()
 
-        with amp.autocast(enabled=(device.type == 'cuda')): # Automatic Mixed Precision
+        with amp.autocast('cuda', enabled=(device.type == 'cuda')): # Automatic Mixed Precision
             outputs = model(images)['out']
             loss = criterion(outputs, masks)
         
@@ -41,7 +41,7 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
         loop = tqdm(dataloader, total=len(dataloader), desc=f"[Val] Epoch {epoch}")
         for images, masks in loop:
             images, masks = images.to(device), masks.to(device)
-            with amp.autocast(enabled=(device.type == 'cuda')): # AMP for validation
+            with amp.autocast('cuda', enabled=(device.type == 'cuda')): # AMP for validation
                 outputs = model(images)['out']
                 loss = criterion(outputs, masks)
             

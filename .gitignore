@@ -175,3 +175,8 @@ cython_debug/
 
 # Local datasets
 LaRS_dataset/
+
+# Another
+ino.txt
+
+.vscode/
