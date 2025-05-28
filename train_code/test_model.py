@@ -186,8 +186,8 @@ def main(args):
     print(f"Test dataset loaded: {len(test_dataset)} images.")
 
     # --- Load Model ---
-    # model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
-    model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
+    model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
+    # model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
     # model.load_state_dict(torch.load(model_path_to_test, map_location=device))
     state_dict = torch.load(model_path_to_test, map_location=device)
     new_state_dict = {}
@@ -470,7 +470,7 @@ def main(args):
     print(f"\nTest summary saved to: {csv_path}")
 
     # Auto-run sum.py after test
-    sum_script = "/home/grace/Documents/ce340-lars-semantic/sum.py"
+    sum_script = "/home/grace/Documents/ce340-lars-semantic/output/sum.py"
     try:
         subprocess.run([sys.executable, sum_script], check=True)
         print("Auto-summarized all test_summary.csv files.")

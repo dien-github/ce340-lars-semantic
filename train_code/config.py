@@ -1,5 +1,6 @@
 import glob
 import os
+from matplotlib.pylab import f
 import torch
 from datetime import datetime
 
@@ -11,7 +12,12 @@ class Config:
     learning_rate = 1e-4
     input_size = (320, 320)
     model_type = "lraspp" # "lraspp" or "deeplab"
+    freeze_layers = None # None, "backbone", "classifier", or "all"
+    unfreeze_layers = ["backbone", "classifier"] # None, "backbone", "classifier", or "all"
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    loss_type = 'combined' # cross_entropy, dice, or combined
+    ce_weight = 1.0 # Weight for cross-entropy loss
+    dice_weight = 1.0 # Weight for Dice loss
     cudnn_benchmark = True # Set to True for speed if input sizes are fixed
 
     dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
