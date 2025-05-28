@@ -188,7 +188,15 @@ def main(args):
     # --- Load Model ---
     # model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
     model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
-    model.load_state_dict(torch.load(model_path_to_test, map_location=device))
+    # model.load_state_dict(torch.load(model_path_to_test, map_location=device))
+    state_dict = torch.load(model_path_to_test, map_location=device)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k.startswith('_orig_mod.'):
+            new_state_dict[k[len('_orig_mod.'):]] = v
+        else:
+            new_state_dict[k] = v
+    model.load_state_dict(new_state_dict)
     model.eval()
     if args.compile_model and hasattr(torch, "compile") and device.type == "cuda":
         print("Attempting to compile the model with torch.compile()...")

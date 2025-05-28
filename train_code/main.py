@@ -104,15 +104,26 @@ criterion = nn.CrossEntropyLoss()
 # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs, eta_min=1e-6)
 # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  # StepLR for periodic decay
 optimizer = optim.Adam((p for p in model.parameters() if p.requires_grad), lr=config.learning_rate)
+# scheduler = optim.lr_scheduler.OneCycleLR(
+#     optimizer,
+#     max_lr=config.learning_rate,
+#     steps_per_epoch=len(train_loader),
+#     epochs=config.epochs,
+#     pct_start=0.1,
+#     anneal_strategy='cos',
+#     cycle_momentum=False
+# )
 scheduler = optim.lr_scheduler.OneCycleLR(
-    optimizer,
-    max_lr=config.learning_rate,
+    optimizer, 
+    max_lr=3e-4, 
     steps_per_epoch=len(train_loader),
-    epochs=config.epochs,
-    pct_start=0.1,
-    anneal_strategy='cos',
+    epochs=20,
+    pct_start=0.3,
+    div_factor=100,  # LR start từ 3e-6
+    final_div_factor=100,  # kết thúc ~3e-6
     cycle_momentum=False
 )
+
 scaler = amp.GradScaler(enabled=(device_obj.type == 'cuda'))
 
 # Training loop
