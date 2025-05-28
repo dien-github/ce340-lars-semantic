@@ -1,6 +1,6 @@
 import os
-from metrics import *
-from model import *
+from metrics import get_target_from_data, eval_results
+from model import Model
 from PIL import Image
 import time
 import numpy as np

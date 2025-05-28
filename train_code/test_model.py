@@ -11,10 +11,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
+import subprocess
+import sys
 
 from config import Config
 from data.dataset import LaRSDataset
-from model.deeplab import get_deeplab_model
+from model.deeplab import get_deeplab_model, get_lraspp_model
 
 # Constants for test data (adjust if your structure is different)
 TEST_DATA_ROOT = "/home/grace/Documents/ce340-lars-semantic/lars"
@@ -184,7 +186,8 @@ def main(args):
     print(f"Test dataset loaded: {len(test_dataset)} images.")
 
     # --- Load Model ---
-    model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
+    # model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
+    model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
     model.load_state_dict(torch.load(model_path_to_test, map_location=device))
     model.eval()
     if args.compile_model and hasattr(torch, "compile") and device.type == "cuda":
@@ -458,19 +461,15 @@ def main(args):
         writer.writerow(csv_row)
     print(f"\nTest summary saved to: {csv_path}")
 
+    # Auto-run sum.py after test
+    sum_script = "/home/grace/Documents/ce340-lars-semantic/sum.py"
+    try:
+        subprocess.run([sys.executable, sum_script], check=True)
+        print("Auto-summarized all test_summary.csv files.")
+    except Exception as e:
+        print(f"Failed to run sum.py: {e}")
+
     print(f"\nVisualizations and detailed logs saved in: {output_base_dir}")
-    print(
-        "Note on versioning plots: This script logs metrics for the current model version."
-    )
-    print(
-        "To plot metrics across different model versions, you would typically run this test script"
-    )
-    print(
-        "for each version, ensuring CSV outputs are stored uniquely (e.g., by model name or timestamp)."
-    )
-    print(
-        "Then, a separate script can read these multiple CSVs to generate comparative/trend plots."
-    )
 
 
 if __name__ == "__main__":
