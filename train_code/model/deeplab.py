@@ -1,7 +1,38 @@
 import torch
 import torchvision
 
-def get_deeplab_model(num_classes, device):
+def set_requires_grad(model, freeze_layers=None, unfreeze_layers=None):
+    """
+    Freeze or unfreeze layers by name or type.
+    Args:
+        model: nn.Module
+        freeze_layers: list of str or type, layers to freeze (set requires_grad=False)
+        unfreeze_layers: list of str or type, layers to unfreeze (set requires_grad=True)
+    """
+    # First freeze all if freeze_layers is None (default)
+    if freeze_layers is None:
+        for param in model.parameters():
+            param.requires_grad = False
+    else:
+        for name, module in model.named_modules():
+            if any(
+                (isinstance(module, t) if isinstance(t, type) else t in name)
+                for t in freeze_layers
+            ):
+                for param in module.parameters(recurse=False):
+                    param.requires_grad = False
+
+    # Then unfreeze specified layers
+    if unfreeze_layers is not None:
+        for name, module in model.named_modules():
+            if any(
+                (isinstance(module, t) if isinstance(t, type) else t in name)
+                for t in unfreeze_layers
+            ):
+                for param in module.parameters(recurse=False):
+                    param.requires_grad = True
+
+def get_deeplab_model(num_classes, device, freeze_layers=None, unfreeze_layers=None):
     """
     Load the pre-trained DeepLabV3 model with MobileNetV3 backbone.
     
@@ -38,17 +69,14 @@ def get_deeplab_model(num_classes, device):
     )
     model = model.to(device)
     
-    # Freeze the model parameters
-    for param in model.parameters():
-        param.requires_grad = False
-    
-    # Unfreeze the classifier layer
-    for param in model.classifier.parameters():
-        param.requires_grad = True
-    
+    set_requires_grad(
+        model,
+        freeze_layers=freeze_layers,
+        unfreeze_layers=unfreeze_layers if unfreeze_layers is not None else ["classifier"]
+    )
     return model
 
-def get_lraspp_model(num_classes, device):
+def get_lraspp_model(num_classes, device, freeze_layers=None, unfreeze_layers=None):
     """
     Load the pre-trained LR-ASPP model with MobileNetV3 backbone.
     """
@@ -74,11 +102,9 @@ def get_lraspp_model(num_classes, device):
     )
     model = model.to(device)
 
-    # Freeze all parameters
-    for param in model.parameters():
-        param.requires_grad = False
-    # Unfreeze only the classifier layer
-    for param in model.classifier.parameters():
-        param.requires_grad = True
-
+    set_requires_grad(
+        model,
+        freeze_layers=freeze_layers,
+        unfreeze_layers=unfreeze_layers if unfreeze_layers is not None else ["classifier"]
+    )
     return model
