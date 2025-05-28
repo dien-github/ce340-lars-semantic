@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.amp as amp
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epoch):
+def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None):
     model.train()
     running_loss = 0.0
     loop = tqdm(enumerate(dataloader), total=len(dataloader), desc=f"[Train] Epoch {epoch}")
@@ -25,9 +25,12 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         scaler.step(optimizer)
         # Updates the scale for next iteration.
         scaler.update()
+
+        if scheduler:
+            scheduler.step()
         
         running_loss += loss.item() * images.size(0)
-        loop.set_postfix(loss=loss.item())
+        loop.set_postfix(loss=loss.item(), lr=optimizer.param_groups[0]['lr'])
     
     epoch_loss = running_loss / len(dataloader.dataset)
     print(f"Epoch {epoch} Training Loss: {epoch_loss:.4f}")

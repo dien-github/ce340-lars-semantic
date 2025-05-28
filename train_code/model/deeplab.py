@@ -47,3 +47,38 @@ def get_deeplab_model(num_classes, device):
         param.requires_grad = True
     
     return model
+
+def get_lraspp_model(num_classes, device):
+    """
+    Load the pre-trained LR-ASPP model with MobileNetV3 backbone.
+    """
+    pretrained_model_num_classes = 21
+    model = torchvision.models.segmentation.lraspp_mobilenet_v3_large(
+        weights=torchvision.models.segmentation.LRASPP_MobileNet_V3_Large_Weights.DEFAULT,
+        num_classes=pretrained_model_num_classes
+    )
+    # Thay đổi cả hai classifier để cùng output đúng số class
+    original_low_conv = model.classifier.low_classifier
+    original_high_conv = model.classifier.high_classifier
+    model.classifier.low_classifier = torch.nn.Conv2d(
+        in_channels=original_low_conv.in_channels,
+        out_channels=num_classes,
+        kernel_size=original_low_conv.kernel_size,
+        stride=original_low_conv.stride
+    )
+    model.classifier.high_classifier = torch.nn.Conv2d(
+        in_channels=original_high_conv.in_channels,
+        out_channels=num_classes,
+        kernel_size=original_high_conv.kernel_size,
+        stride=original_high_conv.stride
+    )
+    model = model.to(device)
+
+    # Freeze all parameters
+    for param in model.parameters():
+        param.requires_grad = False
+    # Unfreeze only the classifier layer
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    return model
