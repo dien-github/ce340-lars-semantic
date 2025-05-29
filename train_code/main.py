@@ -13,11 +13,14 @@ import torch.amp as amp
 import os
 
 def main(args):
-    config = Config()
+    # Initialize Config with the dataset_path from arguments
+    # This ensures all paths within Config are correctly based on the runtime environment (e.g., Kaggle)
+    config = Config(dataset_path_override=args.dataset_path)
+
     #Update config with command line arguments
     for key, value in vars(args).items():
         if value is not None and hasattr(config, key):
-            print(f"Updating config: {key} = {value}")
+            # print(f"Updating config: {key} = {value}") # dataset_path is already handled by __init__
             setattr(config, key, value)
 
     # Paths are now properties of config and will use the calculated run_id and base_model_name

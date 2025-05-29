@@ -24,21 +24,26 @@ class Config:
     dice_weight = 1.0  # Weight for Dice loss
     cudnn_benchmark = True  # Set to True for speed if input sizes are fixed
 
-    dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
-
-    val_dataset_path = os.path.join(dataset_path, "lars_v1.0.0_images", "val", "images")
-    train_dataset_path = os.path.join(dataset_path, "lars_v1.0.0_images", "train", "images")
-
-    val_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks")
-    train_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks")
-
-    # Image list files
-    train_image_list_file = os.path.join(dataset_path, "lars_v1.0.0_images", "train", "image_list.txt")
-    val_image_list_file = os.path.join(dataset_path, "lars_v1.0.0_images", "val", "image_list.txt")
+    # dataset_path will be set by the command line argument
 
     load_checkpoint_path = None
 
-    def __init__(self):
+    def __init__(self, dataset_path_override=None):
+        # Allow overriding dataset_path, primarily for Kaggle/Colab environments
+        # If not overridden, it will try to use a default or expect it to be set by args later.
+        # For your Kaggle case, main.py will set this.
+        self.dataset_path = dataset_path_override if dataset_path_override else "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset" # Default local path
+
+        # Update paths to be relative to self.dataset_path
+        self.val_dataset_path = os.path.join(self.dataset_path, "lars_v1.0.0_images", "val", "images")
+        self.train_dataset_path = os.path.join(self.dataset_path, "lars_v1.0.0_images", "train", "images")
+
+        self.val_mask_path = os.path.join(self.dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks")
+        self.train_mask_path = os.path.join(self.dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks")
+
+        self.train_image_list_file = os.path.join(self.dataset_path, "lars_v1.0.0_images", "train", "image_list.txt")
+        self.val_image_list_file = os.path.join(self.dataset_path, "lars_v1.0.0_images", "val", "image_list.txt")
+
         self.date_str = datetime.now().strftime("%Y%m%d")
         self._run_id = None
         self._base_model_name = None
