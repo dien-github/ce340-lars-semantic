@@ -75,15 +75,29 @@ def main(args):
             print(
                 f"Checkpoint not found: {config.load_checkpoint_path}. Starting training from scratch."
             )
+    
+    # Check for multiple GPUs and use DataParallel
+    if torch.cuda.device_count() > 1:
+        print(f"Let's use {torch.cuda.device_count()} GPUs!")
+        model = torch.nn.DataParallel(model)
+    
+    model.to(device_obj) # Ensure model is on the correct device after potentially wrapping with DataParallel
 
     # Optionally compile model (PyTorch 2.0+)
-    if hasattr(torch, "compile") and device_obj.type == "cuda":
-        print("Attempting to compile the model with torch.compile()...")
-        try:
-            model = torch.compile(model)
-            print("Model compiled successfully.")
-        except Exception as e:
-            print(f"Model compilation failed: {e}. Proceeding without compilation.")
+    # Note: torch.compile() with DataParallel might have some issues or specific behaviors.
+    # It's often recommended to use DistributedDataParallel for more complex scenarios with torch.compile.
+    # For simplicity with DataParallel, you might skip compilation or test thoroughly.
+    # If you encounter issues, consider disabling compile when using DataParallel for now.
+    if args.compile_model and hasattr(torch, "compile") and device_obj.type == "cuda":
+        if isinstance(model, torch.nn.DataParallel):
+            print("torch.compile() with nn.DataParallel might have limitations. Proceeding with caution.")
+        # print("Attempting to compile the model with torch.compile()...")
+        # try:
+        #     model = torch.compile(model) # Compiling DataParallel(model)
+        #     print("Model compiled successfully.")
+        # except Exception as e:
+        #     print(f"Model compilation failed: {e}. Proceeding without compilation.")
+        print("Skipping torch.compile() when using nn.DataParallel for wider compatibility for now.")
 
     criterion = get_loss_function(config.loss_type, ce_weight=config.ce_weight, dice_weight=config.dice_weight)
 
@@ -150,7 +164,11 @@ def main(args):
             best_miou = val_miou
             epochs_no_improve = 0
             os.makedirs(os.path.dirname(config.best_model_path), exist_ok=True)
-            torch.save(model.state_dict(), config.best_model_path)
+            # If using DataParallel, save the underlying model's state_dict
+            if isinstance(model, torch.nn.DataParallel):
+                torch.save(model.module.state_dict(), config.best_model_path)
+            else:
+                torch.save(model.state_dict(), config.best_model_path)
             print(f"Best model saved: {config.best_model_path} with mIoU: {best_miou:.4f}")
         else:
             epochs_no_improve += 1
@@ -237,4 +255,9 @@ if __name__ == "__main__":
     parser.add_argument('--loss_type', type=str, choices=['cross_entropy', 'dice', 'combined'], help='Type of loss function to use')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data loading.')
     args = parser.parse_args()
+    
+    # Add an argument for mo del compilation if you want to control it
+    # For now, I've added a placeholder `args.compile_model` check.
+    # You might want to add this to your argparse setup:
+    parser.add_argument('--compile_model', action='store_true', help='Enable torch.compile for the model')
     main(args)
