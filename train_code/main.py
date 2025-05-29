@@ -1,5 +1,5 @@
 from config import Config
-from data.dataset import LaRSDataset
+from data.load import load_datasets
 from model.deeplab import get_deeplab_model, get_lraspp_model
 from train.trainer import train_one_epoch, validate
 from utils.logging import save_run_params
@@ -8,7 +8,6 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
 import argparse
 import torch
-from torch.utils.data import DataLoader
 from torch import optim
 import torch.amp as amp
 import os
@@ -33,64 +32,11 @@ def main(args):
     torch.backends.cudnn.benchmark = config.cudnn_benchmark
     torch.backends.cudnn.deterministic = not config.cudnn_benchmark
 
-
     # Load dataset
-    with open(
-        os.path.join(config.dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"),
-        encoding="utf-8",
-    ) as f:
-        train_names = [line.strip() for line in f]
-    with open(
-        os.path.join(config.dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"),
-        encoding="utf-8",
-    ) as f:
-        val_names = [line.strip() for line in f]
-
-    train_dataset = LaRSDataset(
-        image_dir=os.path.join(
-            config.dataset_path, "lars_v1.0.0_images", "train", "images"
-        ),
-        image_names=train_names,
-        mask_dir=os.path.join(
-            config.dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks"
-        ),
-        transform=None,  # Add torchvision.transforms.Normalize here if needed (after ToTensor)
-        target_size=config.input_size,
-    )
-
-    val_dataset = LaRSDataset(
-        image_dir=os.path.join(config.dataset_path, "lars_v1.0.0_images", "val", "images"),
-        image_names=val_names,
-        mask_dir=os.path.join(
-            config.dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks"
-        ),
-        transform=None,  # Add torchvision.transforms.Normalize here if needed (after ToTensor)
-        target_size=config.input_size,
-    )
-
-    pin_memory_flag = config.device == "cuda"
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=pin_memory_flag,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=pin_memory_flag,
-    )
-
-    print("Dataset loaded successfully.")
-    print(f"Train dataset size: {len(train_dataset)}")
-    print(f"Validation dataset size: {len(val_dataset)}")
-
-    device_obj = torch.device(config.device)
+    train_dataset, val_dataset, train_loader, val_loader = load_datasets(config)
 
     # Model selection
+    device_obj = torch.device(config.device)
     model_type = getattr(config, "model_type", "deeplab").lower()
     if model_type == "deeplab":
         model = get_deeplab_model(num_classes=config.num_classes, device=device_obj)
@@ -281,5 +227,6 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, help='Learning rate for the optimizer')
     parser.add_argument('--seed', type=int, default=2025, help='Random seed for reproducibility')
     parser.add_argument('--loss_type', type=str, choices=['cross_entropy', 'dice', 'combined'], help='Type of loss function to use')
+    parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data loading.')
     args = parser.parse_args()
     main(args)

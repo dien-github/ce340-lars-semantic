@@ -8,6 +8,7 @@ class Config:
     seed = 2025
     num_classes = 3
     batch_size = 32
+    num_workers = 4
     epochs = 20
     learning_rate = 1e-4
     input_size = (320, 320)
@@ -24,29 +25,19 @@ class Config:
     cudnn_benchmark = True  # Set to True for speed if input sizes are fixed
 
     dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
+    
     val_dataset_path = os.path.join(dataset_path, "lars_v1.0.0_images", "val", "images")
-    train_dataset_path = os.path.join(
-        dataset_path, "lars_v1.0.0_images", "train", "images"
-    )
-    val_mask_path = os.path.join(
-        dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks"
-    )
-    train_mask_path = os.path.join(
-        dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks"
-    )
-    with open(
-        os.path.join(dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"),
-        encoding="utf-8",
-    ) as f:
+    train_dataset_path = os.path.join(dataset_path, "lars_v1.0.0_images", "train", "images")
+    
+    val_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks")
+    train_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks")
+    
+    with open(os.path.join(dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"), encoding="utf-8") as f:
         train_names = [line.strip() for line in f]
-    with open(
-        os.path.join(dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"),
-        encoding="utf-8",
-    ) as f:
+    with open(os.path.join(dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"), encoding="utf-8") as f:
         val_names = [line.strip() for line in f]
 
     date_str = datetime.now().strftime("%Y%m%d")
-
     load_checkpoint_path = None
 
     @property

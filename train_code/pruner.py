@@ -209,7 +209,8 @@ def prune(args):
             base_model_name=original_model_basename, iteration=i + 1
         )
         os.makedirs(os.path.dirname(pruned_model_save_path), exist_ok=True)
-        torch.save(model.state_dict(), pruned_model_save_path)
+        # torch.save(model.state_dict(), pruned_model_save_path)
+        torch.save(model, pruned_model_save_path)
         # print(f"Pruned model saved to: {pruned_model_save_path}")
 
         # Print model size before and after pruning
