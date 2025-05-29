@@ -8,7 +8,7 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
 import torch
 from torch.utils.data import DataLoader
-from torch import nn, optim
+from torch import optim
 import torch.amp as amp
 import os
 # import random
