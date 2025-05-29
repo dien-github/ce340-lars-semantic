@@ -175,6 +175,7 @@ cython_debug/
 
 # Local datasets
 LaRS_dataset/
+lars/
 
 # Another
 ino.md
