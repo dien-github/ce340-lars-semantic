@@ -77,7 +77,6 @@ def finetune(
         metrics = [
             (time_list, time),
             (train_losses, train_loss),
-            (train_losses, train_loss),
             (val_losses, val_loss),
             (val_accuracies, val_accuracy),
             (val_mious, val_miou),

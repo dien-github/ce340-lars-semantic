@@ -49,8 +49,8 @@ def save_metrics_to_csv(metrics_path, time_list, train_losses, val_losses, val_a
                 val_losses[epoch],
                 val_accuracies[epoch],
                 val_mious[epoch]])
-        if model_size is not None:
-            writer.writerow(['Model Size (MB)', model_size])
+        # if model_size is not None:
+        #     writer.writerow(['Model Size (MB)', model_size])
 
 def save_confusion_matrix(cm, class_names, output_path):
     """
