@@ -1,25 +1,31 @@
 import os
 from torch.utils.data import DataLoader
+from torchvision import transforms # Added for potential normalization
 from data.dataset import LaRSDataset
 
 def load_datasets(config):
-    with open(os.path.join(config.dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"), encoding="utf-8") as f:
-        train_names = [line.strip() for line in f]
-    with open(os.path.join(config.dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"), encoding="utf-8") as f:
-        val_names = [line.strip() for line in f]
+    # train_names and val_names are now properties of the config object
+
+    # Define transformations (e.g., normalization) to be applied after ToTensor
+    # These should be consistent for training and validation
+    image_transforms = None # Example:
+    # image_transforms = transforms.Compose([
+    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # ])
+
     train_dataset = LaRSDataset(
         image_dir=config.train_dataset_path,
-        image_names=train_names,
+        image_names=config.train_names, # Use property from config
         mask_dir=config.train_mask_path,
-        transform=None,  # Add torchvision.transforms.Normalize here if needed (after ToTensor)
+        transform=image_transforms,
         target_size=config.input_size,
     )
 
     val_dataset = LaRSDataset(
         image_dir=config.val_dataset_path,
-        image_names=val_names,
+        image_names=config.val_names, # Use property from config
         mask_dir=config.val_mask_path,
-        transform=None,  # Add torchvision.transforms.Normalize here if needed (after ToTensor)
+        transform=image_transforms, # Apply same non-augmenting transforms to val
         target_size=config.input_size,
     )
 

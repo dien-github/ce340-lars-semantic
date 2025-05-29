@@ -40,16 +40,17 @@ class LaRSDataset(Dataset):
         image_pil, mask_pil = self._load_image_mask_pil(image_id)
 
         if image_pil is None or mask_pil is None:
-            raise FileNotFoundError(f"Image or mask not found for ID: {image_id}")
-        
-        # Apply transformations to image (e.g., ToTensor, Normalize)
-        image_tensor = transforms.ToTensor()(image_pil) # ToTensor should be applied first to PIL image
-        if self.transform: # self.transform should expect a tensor if ToTensor is applied before
+            # _load_image_mask_pil already prints a warning.
+            # Raising an error here helps to catch data issues early.
+            raise FileNotFoundError(f"Image or mask PIL object is None for ID: {image_id}. "
+                                    "This might be due to a file not found or other loading issue.")
+
+        image_tensor = transforms.ToTensor()(image_pil) # Convert PIL image to tensor
+        if self.transform: # Apply additional transforms if any (e.g., normalization)
             image_tensor = self.transform(image_tensor)
-        
-        # Process mask: convert to numpy, handle ignore_index, then convert to tensor
+
         mask_numpy = np.array(mask_pil, dtype=np.int64)
         mask_numpy[mask_numpy == 255] = 0  # Replace ignore index (255) with a valid class (e.g., 0 for background)
         mask_tensor = torch.from_numpy(mask_numpy)
-        
+
         return image_tensor, mask_tensor
