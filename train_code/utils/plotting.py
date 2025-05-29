@@ -40,17 +40,28 @@ def save_metrics_to_csv(metrics_path, time_list, train_losses, val_losses, val_a
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True) # Ensure directory exists
     with open(metrics_path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['Epoch', 'Train Loss', 'Validation Loss', 'Validation Accuracy', 'mIoU'])
+        header = ['Epoch', 'Time (s)', 'Train Loss', 'Validation Loss', 'Validation Accuracy', 'mIoU']
+        writer.writerow(header)
+
         for epoch in range(len(train_losses)):
+            # Ensure all lists are of the same length as train_losses
+            time_val = f"{time_list[epoch]:.2f}" if epoch < len(time_list) and isinstance(time_list[epoch], float) else (time_list[epoch] if epoch < len(time_list) else 'N/A')
+            val_loss_val = val_losses[epoch] if epoch < len(val_losses) else 'N/A'
+            val_acc_val = val_accuracies[epoch] if epoch < len(val_accuracies) else 'N/A'
+            val_miou_val = val_mious[epoch] if epoch < len(val_mious) else 'N/A'
+            
             writer.writerow([
                 epoch + 1,
-                time_list[epoch],
+                time_val,
                 train_losses[epoch],
-                val_losses[epoch],
-                val_accuracies[epoch],
-                val_mious[epoch]])
-        # if model_size is not None:
-        #     writer.writerow(['Model Size (MB)', model_size])
+                val_loss_val,
+                val_acc_val,
+                val_miou_val
+            ])
+        
+        if model_size is not None:
+            writer.writerow([]) # Add an empty line for separation
+            writer.writerow(['Final Model Size (MB)', f"{model_size:.2f}"])
 
 def save_confusion_matrix(cm, class_names, output_path):
     """
