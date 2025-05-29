@@ -31,11 +31,6 @@ class Config:
     
     val_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks")
     train_mask_path = os.path.join(dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks")
-    
-    with open(os.path.join(dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"), encoding="utf-8") as f:
-        train_names = [line.strip() for line in f]
-    with open(os.path.join(dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"), encoding="utf-8") as f:
-        val_names = [line.strip() for line in f]
 
     date_str = datetime.now().strftime("%Y%m%d")
     load_checkpoint_path = None
