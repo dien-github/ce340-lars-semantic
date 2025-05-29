@@ -1,5 +1,4 @@
 import argparse
-import math
 import os
 import torch
 import torch.nn.utils.prune as prune_utils

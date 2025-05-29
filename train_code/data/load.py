@@ -1,17 +1,9 @@
-import os
 from torch.utils.data import DataLoader
-from torchvision import transforms # Added for potential normalization
+# from torchvision import transforms # Added for potential normalization
 from data.dataset import LaRSDataset
 
 def load_datasets(config):
-    # train_names and val_names are now properties of the config object
-
-    # Define transformations (e.g., normalization) to be applied after ToTensor
-    # These should be consistent for training and validation
     image_transforms = None # Example:
-    # image_transforms = transforms.Compose([
-    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # ])
 
     train_dataset = LaRSDataset(
         image_dir=config.train_dataset_path,
