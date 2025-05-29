@@ -1,5 +1,4 @@
 import os
-import time
 from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
 def test_save_metrics_plot_and_csv(tmp_path):

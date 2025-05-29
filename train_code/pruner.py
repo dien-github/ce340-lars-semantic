@@ -121,8 +121,7 @@ def prune(args):
     model.to(device_obj)
     print("Model loaded successfully.")
 
-    example_inputs = torch.randn(1, 3, *config.input_size)
-    example_inputs.to(device_obj)
+    example_inputs = torch.randn(1, 3, *config.input_size).to(device_obj)
     base_macs, base_nparams = tp.utils.count_ops_and_params(model, example_inputs)
 
     val_dataset = LaRSDataset(
@@ -152,9 +151,11 @@ def prune(args):
     print(
         f"Before pruning: MACs={base_macs / 1e9:.4f}G, Params={base_nparams / 1e6:.4f}M"
     )
-    print(metric)
+    print(
+        f"Before pruning:\n\t\tPixel Accuracy {metric['pixel_accuracy']:.4f},\tmIoU {metric['mean_iou']:.4f},\tloss {metric['epoch_val_loss']:.4f}"
+    )
 
-    pruning_ratio = 1 - math.pow((1 - args.prune_rate), 1 / args.iterative_steps)
+    pruning_ratio = 1 - math.pow((1 - args.target_prune_rate), 1 / args.iterative_steps)
     print(f"Pruning ratio: {pruning_ratio:.4f}")
     for i in range(args.iterative_steps):
         model.train()
@@ -164,9 +165,7 @@ def prune(args):
         pruner = tp.pruner.MagnitudePruner(
             model,
             example_inputs=example_inputs,
-            importance=tp.importance.MagnitudeImportance(
-                p=1, group_reduction="mean"
-            ), 
+            importance=tp.importance.MagnitudeImportance(p=1, group_reduction="mean"),
             pruning_ratio=pruning_ratio,
             ignored_layers=ignored_layers,
         )
@@ -195,10 +194,12 @@ def prune(args):
 
         # Validate the pruned model
         metric = validate(
-            model, val_loader, device_obj, config.num_classes, epoch=i + 1
+            model, val_loader, criterion, device_obj, config.num_classes, epoch=i + 1
         )
-        print(f"After pruning iteration {i + 1}: {metric}")
-        initial_miou = metric["mIoU"]
+        print(
+            f"After pruning iteration {i + 1}:\n\t\tPixel Accuracy {metric['pixel_accuracy']:.4f},\tmIoU {metric['mean_iou']:.4f},\tloss {metric['epoch_val_loss']:.4f}"
+        )
+        initial_miou = metric["mean_iou"]
         if metric["mIoU"] < (1 - args.max_map_drop) * initial_miou:
             print(f"mIoU drop exceeded after iteration {i + 1}. Stopping pruning.")
             break
