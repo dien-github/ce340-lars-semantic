@@ -166,10 +166,11 @@ scaler = amp.GradScaler(enabled=(device_obj.type == "cuda"))
 patience = 7
 epochs_no_improve = 0
 train_losses, val_losses, val_accuracies, val_mious = [], [], [], []
+time_list = []
 best_miou = 0.0
 
 for epoch in range(1, config.epochs + 1):
-    train_loss = train_one_epoch(
+    time, train_loss = train_one_epoch(
         model,
         train_loader,
         criterion,
@@ -187,6 +188,7 @@ for epoch in range(1, config.epochs + 1):
     val_losses.append(val_loss)
     val_accuracies.append(val_accuracy)
     val_mious.append(val_miou)
+    time_list.append(time)
 
     if val_miou > best_miou:
         best_miou = val_miou
@@ -205,6 +207,9 @@ for epoch in range(1, config.epochs + 1):
         print(f"Early stopping triggered after {patience} epochs without improvement.")
         break
 
+model_size = os.path.getsize(best_model_path) / (1024 * 1024)  # Size in MB
+print(f"Best model size: {model_size:.2f} MB")
+
 # Save training metrics and parameters
 os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
 save_metrics_plot(
@@ -221,6 +226,8 @@ save_metrics_to_csv(
     val_losses=val_losses,
     val_accuracies=val_accuracies,
     val_mious=val_mious,
+    model_size=model_size,
+    time_list=time_list,
 )
 
 param_log_path = (

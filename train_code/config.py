@@ -4,6 +4,7 @@ from matplotlib.pylab import f
 import torch
 from datetime import datetime
 
+
 class Config:
     seed = 2025
     num_classes = 3
@@ -11,19 +12,45 @@ class Config:
     epochs = 20
     learning_rate = 1e-4
     input_size = (320, 320)
-    model_type = "lraspp" # "lraspp" or "deeplab"
-    freeze_layers = None # None, "backbone", "classifier", or "all"
-    unfreeze_layers = ["backbone", "classifier"] # None, "backbone", "classifier", or "all"
+    model_type = "lraspp"  # "lraspp" or "deeplab"
+    freeze_layers = None  # None, "backbone", "classifier", or "all"
+    unfreeze_layers = [
+        "backbone",
+        "classifier",
+    ]  # None, "backbone", "classifier", or "all"
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    loss_type = 'combined' # cross_entropy, dice, or combined
-    ce_weight = 1.0 # Weight for cross-entropy loss
-    dice_weight = 1.0 # Weight for Dice loss
-    cudnn_benchmark = True # Set to True for speed if input sizes are fixed
+    loss_type = "combined"  # cross_entropy, dice, or combined
+    ce_weight = 1.0  # Weight for cross-entropy loss
+    dice_weight = 1.0  # Weight for Dice loss
+    cudnn_benchmark = True  # Set to True for speed if input sizes are fixed
 
     dataset_path = "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
+    val_dataset_path = os.path.join(dataset_path, "lars_v1.0.0_images", "val", "images")
+    train_dataset_path = os.path.join(
+        dataset_path, "lars_v1.0.0_images", "train", "images"
+    )
+    val_mask_path = os.path.join(
+        dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks"
+    )
+    train_mask_path = os.path.join(
+        dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks"
+    )
+    with open(
+        os.path.join(dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"),
+        encoding="utf-8",
+    ) as f:
+        train_names = [line.strip() for line in f]
+    with open(
+        os.path.join(dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"),
+        encoding="utf-8",
+    ) as f:
+        val_names = [line.strip() for line in f]
+
     date_str = datetime.now().strftime("%Y%m%d")
 
-    load_checkpoint_path = None # "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
+    load_checkpoint_path = (
+        None  # "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
+    )
 
     @property
     def run_id(self):
@@ -47,11 +74,11 @@ class Config:
     @property
     def best_model_path(self):
         return f"checkpoints/train/{self.date_str}/{self.base_model_name}.pth"
-    
-    def pruned_model_path(self, base_model_name=None):
+
+    def pruned_model_path(self, base_model_name=None, iteration=None):
         if base_model_name is None:
             base_model_name = self.base_model_name
-        return f"checkpoints/train/{self.date_str}/{base_model_name}_pruned.pth"
+        return f"checkpoints/prune/{base_model_name}/prune_{iteration}.pth"
 
     def quantized_model_path(self, base_model_name=None):
         if base_model_name is None:
@@ -62,13 +89,12 @@ class Config:
         if base_model_name is None:
             base_model_name = self.base_model_name
         return f"checkpoints/train/{self.date_str}/{base_model_name}.tflite"
-    
+
     def onnx_model_path(self, base_model_name=None):
         if base_model_name is None:
             base_model_name = self.base_model_name
         return f"checkpoints/train/{self.date_str}/{base_model_name}.onnx"
-    
-    
+
     @property
     def metrics_path(self):
         return f"output/train/{self.date_str}/{self.base_model_name}_metrics.csv"

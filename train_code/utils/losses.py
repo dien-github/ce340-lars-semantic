@@ -10,7 +10,7 @@ class DiceLoss(nn.Module):
 
     def forward(self, inputs, targets):
         num_classes = inputs.shape[1]
-        targets_one_hot = F.onehot(targets, num_classes).permute(0, 3, 1, 2).float()
+        targets_one_hot = F.one_hot(targets, num_classes).permute(0, 3, 1, 2).float()
 
         inputs = torch.softmax(inputs, dim=1)
 

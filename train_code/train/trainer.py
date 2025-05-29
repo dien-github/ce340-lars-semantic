@@ -33,8 +33,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
         loop.set_postfix(loss=loss.item(), lr=optimizer.param_groups[0]['lr'])
     
     epoch_loss = running_loss / len(dataloader.dataset)
+    epoch_time = loop.format_dict['elapsed']
     print(f"Epoch {epoch} Training Loss: {epoch_loss:.4f}")
-    return epoch_loss
+    return epoch_time, epoch_loss
 
 def validate(model, dataloader, criterion, device, num_classes, epoch):
     model.eval()
@@ -62,7 +63,7 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
             
             loop.set_postfix(iou_scores=[np.mean(iou) if iou else 0 for iou in iou_scores])
     mean_iou = np.mean([np.mean(iou) if iou else 0 for iou in iou_scores])
-    accuracy = correct_pixels / total_pixels
+    pixel_accuracy = correct_pixels / total_pixels
     epoch_val_loss = running_val_loss / len(dataloader.dataset)
-    print(f"Validation Accuracy: {accuracy:.4f}, Loss: {epoch_val_loss:.4f}, mIoU: {mean_iou:.4f}")
-    return accuracy, mean_iou, epoch_val_loss
+    print(f"Validation accuracy: {pixel_accuracy:.4f}, Loss: {epoch_val_loss:.4f}, mIoU: {mean_iou:.4f}")
+    return pixel_accuracy, mean_iou, epoch_val_loss

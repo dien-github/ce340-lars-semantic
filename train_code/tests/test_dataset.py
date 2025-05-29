@@ -1,5 +1,5 @@
 import pytest
-from train_code.data.dataset import LaRSDataset
+from data.dataset import LaRSDataset
 
 def test_dataset_len_and_getitem(tmp_path):
     # Tạo dữ liệu giả lập
