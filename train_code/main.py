@@ -253,11 +253,9 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, help='Learning rate for the optimizer')
     parser.add_argument('--seed', type=int, default=2025, help='Random seed for reproducibility')
     parser.add_argument('--loss_type', type=str, choices=['cross_entropy', 'dice', 'combined'], help='Type of loss function to use')
+    # Add an argument for model compilation if you want to control it
+    parser.add_argument('--compile_model', action='store_true', help='Enable torch.compile for the model')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data loading.')
     args = parser.parse_args()
     
-    # Add an argument for mo del compilation if you want to control it
-    # For now, I've added a placeholder `args.compile_model` check.
-    # You might want to add this to your argparse setup:
-    parser.add_argument('--compile_model', action='store_true', help='Enable torch.compile for the model')
     main(args)
