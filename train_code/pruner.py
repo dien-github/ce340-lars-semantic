@@ -22,7 +22,7 @@ def finetune(
     val_losses=None,
     val_accuracies=None,
     val_mious=None,
-    device=None
+    device=None,
 ):
     """
     Fine-tune the pruned model for a specified number of epochs.
@@ -164,6 +164,9 @@ def prune(args):
         pruner = tp.pruner.MagnitudePruner(
             model,
             example_inputs=example_inputs,
+            importance=tp.importance.MagnitudeImportance(
+                p=1, group_reduction="mean"
+            ), 
             pruning_ratio=pruning_ratio,
             ignored_layers=ignored_layers,
         )
