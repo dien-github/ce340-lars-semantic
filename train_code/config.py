@@ -1,6 +1,5 @@
 import glob
 import os
-from matplotlib.pylab import f
 import torch
 from datetime import datetime
 
@@ -48,9 +47,7 @@ class Config:
 
     date_str = datetime.now().strftime("%Y%m%d")
 
-    load_checkpoint_path = (
-        None  # "/home/grace/Documents/ce340-lars-semantic/checkpoints/best_model.pth"
-    )
+    load_checkpoint_path = None
 
     @property
     def run_id(self):
