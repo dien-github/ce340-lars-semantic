@@ -17,13 +17,13 @@ def main(args):
     #Update config with command line arguments
     for key, value in vars(args).items():
         if value is not None and hasattr(config, key):
+            print(f"Updating config: {key} = {value}")
             setattr(config, key, value)
 
-    run_id = config.run_id
-    base_model_name = f"best_model_{config.date_str}_{run_id}"
-    best_model_path = f"checkpoints/train/{config.date_str}/{base_model_name}.pth"
-    metrics_path = f"output/train/{config.date_str}/{base_model_name}_metrics.csv"
-    plots_path = f"output/train/{config.date_str}/{base_model_name}_metrics.png"
+    # Paths are now properties of config and will use the calculated run_id and base_model_name
+    # best_model_path = config.best_model_path (example, used directly later)
+    # metrics_path = config.metrics_path (example, used directly later)
+    # plots_path = config.plots_path (example, used directly later)
 
     # Set random seeds for reproducibility
     torch.manual_seed(config.seed)
@@ -91,23 +91,25 @@ def main(args):
     optimizer = optim.Adam(
         (p for p in model.parameters() if p.requires_grad), lr=config.learning_rate
     )
-    # scheduler = optim.lr_scheduler.OneCycleLR(
-    #     optimizer,
-    #     max_lr=config.learning_rate,
-    #     steps_per_epoch=len(train_loader),
-    #     epochs=config.epochs,
-    #     pct_start=0.1,
-    #     anneal_strategy='cos',
-    #     cycle_momentum=False
-    # )
+
+    # Configure OneCycleLR using values from config or provide specific ones in Config class
+    # Ensure scheduler_epochs matches the actual number of training epochs
+    scheduler_max_lr = getattr(config, 'scheduler_max_lr', config.learning_rate)
+    scheduler_epochs = config.epochs # Use config.epochs which might have been updated by args
+    scheduler_pct_start = getattr(config, 'scheduler_pct_start', 0.3)
+    # The original code used div_factor=100, final_div_factor=100.
+    # PyTorch defaults are 25.0 and 1e4. Using configurable values:
+    scheduler_div_factor = getattr(config, 'scheduler_div_factor', 100.0)
+    scheduler_final_div_factor = getattr(config, 'scheduler_final_div_factor', 100.0)
+
     scheduler = optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=3e-4,
+        max_lr=scheduler_max_lr,
         steps_per_epoch=len(train_loader),
-        epochs=20,
-        pct_start=0.3,
-        div_factor=100,  # LR start từ 3e-6
-        final_div_factor=100,  # kết thúc ~3e-6
+        epochs=scheduler_epochs,
+        pct_start=scheduler_pct_start,
+        div_factor=scheduler_div_factor,
+        final_div_factor=scheduler_final_div_factor,
         cycle_momentum=False,
     )
 
@@ -144,9 +146,9 @@ def main(args):
         if val_miou > best_miou:
             best_miou = val_miou
             epochs_no_improve = 0
-            os.makedirs(os.path.dirname(best_model_path), exist_ok=True)
-            torch.save(model.state_dict(), best_model_path)
-            print(f"Best model saved: {best_model_path} with mIoU: {best_miou:.4f}")
+            os.makedirs(os.path.dirname(config.best_model_path), exist_ok=True)
+            torch.save(model.state_dict(), config.best_model_path)
+            print(f"Best model saved: {config.best_model_path} with mIoU: {best_miou:.4f}")
         else:
             epochs_no_improve += 1
             print(f"No improvement in mIoU for {epochs_no_improve} epochs.")
@@ -158,21 +160,26 @@ def main(args):
             print(f"Early stopping triggered after {patience} epochs without improvement.")
             break
 
-    model_size = os.path.getsize(best_model_path) / (1024 * 1024)  # Size in MB
+    # Ensure the best model was actually saved before trying to get its size
+    if os.path.exists(config.best_model_path):
+        model_size = os.path.getsize(config.best_model_path) / (1024 * 1024)  # Size in MB
+    else:
+        print(f"Warning: Best model path {config.best_model_path} not found. Size will be 0.")
+        model_size = 0
     print(f"Best model size: {model_size:.2f} MB")
 
     # Save training metrics and parameters
-    os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
+    os.makedirs(os.path.dirname(config.metrics_path), exist_ok=True)
     save_metrics_plot(
         epochs_range=range(1, len(train_losses) + 1),
         train_losses=train_losses,
         val_losses=val_losses,
         val_accuracies=val_accuracies,
         val_mious=val_mious,
-        plot_path=plots_path,
+        plot_path=config.plots_path,
     )
     save_metrics_to_csv(
-        metrics_path=metrics_path,
+        metrics_path=config.metrics_path,
         train_losses=train_losses,
         val_losses=val_losses,
         val_accuracies=val_accuracies,
@@ -180,13 +187,15 @@ def main(args):
         model_size=model_size,
         time_list=time_list,
     )
-
+    
     param_log_path = (
-        f"checkpoints/description/{config.date_str}/{base_model_name}_params.txt"
+        f"checkpoints/description/{config.date_str}/{config.base_model_name}_params.txt"
     )
+    os.makedirs(os.path.dirname(param_log_path), exist_ok=True)
+
     params = {
-        "run_id": run_id,
-        "base_model_name": base_model_name,
+        "run_id": config.run_id, # Access property to ensure it's calculated
+        "base_model_name": config.base_model_name, # Access property
         "model_type": model_name,
         "num_classes": config.num_classes,
         "input_size": config.input_size,
@@ -195,14 +204,10 @@ def main(args):
         "learning_rate": config.learning_rate,
         "optimizer": "Adam",
         "scheduler": "OneCycleLR",
-        "scheduler_params": {
-            "max_lr": config.learning_rate,
-            "steps_per_epoch": len(train_loader),
-            "epochs": config.epochs,
-            "pct_start": 0.1,
-            "anneal_strategy": "cos",
-            "cycle_momentum": False,
-        },
+        "scheduler_params": { # Log the actual scheduler parameters used
+            "max_lr": scheduler_max_lr, "steps_per_epoch": len(train_loader), "epochs": scheduler_epochs,
+            "pct_start": scheduler_pct_start, "div_factor": scheduler_div_factor,
+            "final_div_factor": scheduler_final_div_factor, "cycle_momentum": False,},
         "seed": config.seed,
         "dataset_path": config.dataset_path,
         "train_dataset_size": len(train_dataset),
@@ -210,9 +215,9 @@ def main(args):
         "device": config.device,
         "cudnn_benchmark": config.cudnn_benchmark,
         "early_stopping_patience": patience,
-        "best_model_path": best_model_path,
-        "metrics_path": metrics_path,
-        "plots_path": plots_path,
+        "best_model_path": config.best_model_path,
+        "metrics_path": config.metrics_path,
+        "plots_path": config.plots_path,
     }
     save_run_params(param_log_path, params)
 
