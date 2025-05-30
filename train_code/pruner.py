@@ -326,6 +326,7 @@ def prune_main(args):
 def parse_args():
     parser = argparse.ArgumentParser(description="Prune a segmentation model.")
     parser.add_argument("--model", required=True, help="Path to the model to prune")
+    parser.add_argument("--datapath", help="Path to the dataset directory")
     parser.add_argument("--epochs", type=int, default=5, help="Epochs to finetune")
     parser.add_argument("--prune_rate", type=float, default=0.5, help="Pruning ratio")
     parser.add_argument(
