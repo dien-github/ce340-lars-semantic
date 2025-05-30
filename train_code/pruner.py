@@ -140,7 +140,7 @@ def finetune(
 
 
 def prune_main(args):
-    config = Config(dataset_path_override=args.dataset_path)
+    config = Config(dataset_path_override=args.datapath)
     for key, value in vars(args).items():
         if value is not None and hasattr(config, key):
             setattr(config, key, value)
