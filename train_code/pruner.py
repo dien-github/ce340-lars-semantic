@@ -141,6 +141,11 @@ def finetune(
 
 def prune_main(args):
     config = Config()
+    for key, value in vars(args).items():
+        if value is not None and hasattr(config, key):
+            # print(f"Updating config: {key} = {value}") # dataset_path is already handled by __init__
+            setattr(config, key, value)
+
     device_obj = torch.device(config.device)
 
     model_path = args.model
