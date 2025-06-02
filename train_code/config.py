@@ -22,6 +22,7 @@ class Config:
     loss_type = "combined"  # cross_entropy, dice, or combined
     ce_weight = 1.0  # Weight for cross-entropy loss
     dice_weight = 1.0  # Weight for Dice loss
+    lap_weight = 0.5
     cudnn_benchmark = True  # Set to True for speed if input sizes are fixed
 
     # dataset_path will be set by the command line argument
