@@ -100,6 +100,7 @@ def main(args):
         print("Skipping torch.compile() when using nn.DataParallel for wider compatibility for now.")
 
     criterion = get_loss_function(config.loss_type, num_classes=config.num_classes, ce_weight=config.ce_weight, dice_weight=config.dice_weight, lap_weight=config.lap_weight)
+    criterion.to(device_obj)
 
     # optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5)

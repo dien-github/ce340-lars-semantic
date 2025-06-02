@@ -32,6 +32,10 @@ class LaplacianLoss(nn.Module):
         target: tensor shape (B, H, W) chứa nhãn integer [0..C-1] (đối với đa lớp),
                 hoặc (B, H, W) nhị phân {0,1} (nếu num_classes=1).
         """
+        # device=logits.device
+        # kernel = self.kernel.to(device)
+
+
         # 1. Lấy xác suất dự đoán (softmax hoặc sigmoid) tuỳ num_classes
         if self.num_classes > 1:
             prob = F.softmax(logits, dim=1)  # (B, C, H, W)
