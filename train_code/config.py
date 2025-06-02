@@ -11,6 +11,7 @@ class Config:
     num_workers = 4
     epochs = 20
     learning_rate = 1e-4
+    patience = 7
     input_size = (320, 320)
     model_type = "lraspp"  # "lraspp" or "deeplab"
     freeze_layers = None  # None, "backbone", "classifier", or "all"

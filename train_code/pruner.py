@@ -26,50 +26,58 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 #             print(f"Could not prune {name} in {module}: {e}")
 #     return model
 
+
 def apply_iterative_unstructured_pruning(model, target_sparsity, layers_to_prune):
     """
     Apply incremental pruning to reach target sparsity.
     """
     # Calculate current sparsity
     current_sparsity = calculate_sparsity(model, layers_to_prune)
-    
+
     if current_sparsity >= target_sparsity:
-        print(f"Already at target sparsity {current_sparsity:.4f} >= {target_sparsity:.4f}")
+        print(
+            f"Already at target sparsity {current_sparsity:.4f} >= {target_sparsity:.4f}"
+        )
         return model
-    
+
     # Calculate incremental pruning amount
-    remaining_weights = 1 - current_sparsity  
+    remaining_weights = 1 - current_sparsity
     target_removal = target_sparsity - current_sparsity
     incremental_prune_ratio = target_removal / remaining_weights
-    
+
     print(f"Current sparsity: {current_sparsity:.4f}")
-    print(f"Target sparsity: {target_sparsity:.4f}")  
+    print(f"Target sparsity: {target_sparsity:.4f}")
     print(f"Incremental prune ratio: {incremental_prune_ratio:.4f}")
-    
+
     for name, module in layers_to_prune:
         try:
-            prune_utils.l1_unstructured(module, name="weight", amount=incremental_prune_ratio)
+            prune_utils.l1_unstructured(
+                module, name="weight", amount=incremental_prune_ratio
+            )
         except Exception as e:
             print(f"Could not prune {name} in {module}: {e}")
-    
+
     return model
+
 
 def make_pruning_permanent(model, layers_to_prune):
     """Make pruning permanent and clean up gradients."""
     for name, module in layers_to_prune:
         if prune_utils.is_pruned(module):
             prune_utils.remove(module, "weight")
-    
+
     # Clear gradients to free memory
     model.zero_grad()
-    
+
     # Force garbage collection
     import gc
+
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    
+
     return model
+
 
 def get_prunable_layers(model, ignored_modules_list):
     prunable_layers = []
@@ -87,23 +95,20 @@ def get_prunable_layers(model, ignored_modules_list):
                 print(f"Ignoring pruning for layer: {name}")
     return prunable_layers
 
+
 def calculate_sparsity(model, layers_to_prune):
     total_params = 0
     zero_params = 0
     for _, module in layers_to_prune:
-        if hasattr(module, 'weight'): # Check if weight exists
+        if hasattr(module, "weight"):  # Check if weight exists
             total_params += module.weight.nelement()
             zero_params += torch.sum(module.weight == 0).item()
     actual_sparsity = zero_params / total_params if total_params > 0 else 0
     return actual_sparsity
 
+
 def finetune(
-    model,
-    config,
-    epochs,
-    val_loader=None,
-    device=None,
-    current_epoch_offset=0
+    model, config, epochs, val_loader=None, device=None, current_epoch_offset=0
 ):
     """
     Fine-tune the pruned model for a specified number of epochs.
@@ -115,33 +120,35 @@ def finetune(
         image_dir=config.train_dataset_path,
         image_names=config.train_names,
         mask_dir=config.train_mask_path,
-        transform=None, 
+        transform=None,
         target_size=config.input_size,
     )
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=config.num_workers if hasattr(config, 'num_workers') else 4,
+        num_workers=config.num_workers if hasattr(config, "num_workers") else 4,
         pin_memory=(device.type == "cuda"),
     )
 
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate)
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate
+    )
     criterion = get_loss_function(
         config.loss_type, ce_weight=config.ce_weight, dice_weight=config.dice_weight
     )
     criterion.to(device)
     scaler = torch.amp.GradScaler(enabled=(device.type == "cuda"))
-    
+
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=config.learning_rate, 
+        max_lr=config.learning_rate,
         steps_per_epoch=len(train_loader),
-        epochs=epochs, 
-        pct_start=0.3, 
+        epochs=epochs,
+        pct_start=0.3,
         cycle_momentum=False,
     )
-    
+
     session_time_list = []
     session_train_losses = []
     session_val_losses = []
@@ -157,26 +164,39 @@ def finetune(
             optimizer,
             device,
             scaler,
-            actual_epoch_num, 
+            actual_epoch_num,
             scheduler,
         )
         if val_loader:
             val_accuracy, val_miou, val_loss = validate(
-                model, val_loader, criterion, device, config.num_classes, actual_epoch_num
+                model,
+                val_loader,
+                criterion,
+                device,
+                config.num_classes,
+                actual_epoch_num,
             )
         else:
-            val_accuracy, val_miou, val_loss = 0.0, 0.0, float('inf')
+            val_accuracy, val_miou, val_loss = 0.0, 0.0, float("inf")
 
         session_time_list.append(time_taken)
         session_train_losses.append(train_loss)
         session_val_losses.append(val_loss)
         session_val_accuracies.append(val_accuracy)
         session_val_mious.append(val_miou)
-        
-        print(f"Finetune Epoch {epoch}/{epochs} (Global {actual_epoch_num}): Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}, Val mIoU: {val_miou:.4f}")
+
+        print(
+            f"Finetune Epoch {epoch}/{epochs} (Global {actual_epoch_num}): Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}, Val mIoU: {val_miou:.4f}"
+        )
 
     print("Fine-tuning complete for this iteration.")
-    return session_time_list, session_train_losses, session_val_losses, session_val_accuracies, session_val_mious
+    return (
+        session_time_list,
+        session_train_losses,
+        session_val_losses,
+        session_val_accuracies,
+        session_val_mious,
+    )
 
 
 def prune_main(args):
@@ -192,9 +212,7 @@ def prune_main(args):
         print(f"Error: Model path '{model_path}' not found or not specified.")
         return
 
-    model = get_lraspp_model(
-        num_classes=config.num_classes,
-        device=device_obj)
+    model = get_lraspp_model(num_classes=config.num_classes, device=device_obj)
     for param in model.parameters():
         param.requires_grad = True
 
@@ -227,15 +245,19 @@ def prune_main(args):
         val_dataset,
         batch_size=config.batch_size,
         shuffle=False,
-        num_workers=config.num_workers if hasattr(config, 'num_workers') else 4,
+        num_workers=config.num_workers if hasattr(config, "num_workers") else 4,
         pin_memory=(device_obj.type == "cuda"),
     )
     criterion = get_loss_function(
-        config.loss_type, num_classes=config.num_classes, ce_weight=config.ce_weight, dice_weight=config.dice_weight, lap_weight=config.lap_weight
+        config.loss_type,
+        num_classes=config.num_classes,
+        ce_weight=config.ce_weight,
+        dice_weight=config.dice_weight,
+        lap_weight=config.lap_weight,
     )
     print("Validating model before pruning...")
     val_acc_before, miou_before, val_loss_before = validate(
-        model, val_loader, criterion, device_obj, config.num_classes, epoch=0 
+        model, val_loader, criterion, device_obj, config.num_classes, epoch=0
     )
     print("Model before pruning:")
     print(
@@ -246,9 +268,9 @@ def prune_main(args):
     )
 
     ignored_modules = []
-    if hasattr(model, 'classifier'):
+    if hasattr(model, "classifier"):
         ignored_modules.append(model.classifier)
-    
+
     prunable_layers = get_prunable_layers(model, ignored_modules)
     if not prunable_layers:
         print("No prunable Conv2D layers found (excluding ignored modules). Exiting.")
@@ -260,19 +282,27 @@ def prune_main(args):
     all_iter_val_losses = []
     all_iter_val_accuracies = []
     all_iter_val_mious = []
-    
+
     for i in range(args.iterative_steps):
         iteration_num = i + 1
         model.train()
         print(f"Pruning iteration {iteration_num}/{args.iterative_steps}...")
 
-        current_iteration_target_sparsity = args.target_prune_rate * (iteration_num / args.iterative_steps)
-        
-        print(f"Applying L1 unstructured pruning to target sparsity: {current_iteration_target_sparsity:.4f}")
-        apply_iterative_unstructured_pruning(model, current_iteration_target_sparsity, prunable_layers)
+        current_iteration_target_sparsity = args.target_prune_rate * (
+            iteration_num / args.iterative_steps
+        )
+
+        print(
+            f"Applying L1 unstructured pruning to target sparsity: {current_iteration_target_sparsity:.4f}"
+        )
+        apply_iterative_unstructured_pruning(
+            model, current_iteration_target_sparsity, prunable_layers
+        )
 
         sparsity_after_masking = calculate_sparsity(model, prunable_layers)
-        print(f"Sparsity after applying masks (iteration {iteration_num}): {sparsity_after_masking:.4f}")
+        print(
+            f"Sparsity after applying masks (iteration {iteration_num}): {sparsity_after_masking:.4f}"
+        )
 
         # Fine-tune the pruned model
         print(f"Fine-tuning for {args.epochs} epochs (Iteration {iteration_num})...")
@@ -294,29 +324,67 @@ def prune_main(args):
         # Validate the pruned model
         print(f"Validating after fine-tuning (Iteration {iteration_num})...")
         val_acc_after_ft, miou_after_ft, val_loss_after_ft = validate(
-            model, val_loader, criterion, device_obj, config.num_classes, epoch=finetune_epoch_offset + args.epochs
+            model,
+            val_loader,
+            criterion,
+            device_obj,
+            config.num_classes,
+            epoch=finetune_epoch_offset + args.epochs,
         )
         print(
             f"After fine-tuning iteration {iteration_num}: Pixel Acc {val_acc_after_ft:.4f}, mIoU {miou_after_ft:.4f}, Loss {val_loss_after_ft:.4f}"
         )
 
         if miou_after_ft < (1 - args.max_map_drop) * miou_before:
-            print(f"mIoU ({miou_after_ft:.4f}) dropped below threshold relative to original mIoU ({miou_before:.4f}) after iteration {iteration_num}. Stopping pruning.")
+            print(
+                f"mIoU ({miou_after_ft:.4f}) dropped below threshold relative to original mIoU ({miou_before:.4f}) after iteration {iteration_num}. Stopping pruning."
+            )
             break
 
         # Save the pruned model of each iteration
         original_model_basename = os.path.splitext(os.path.basename(model_path))[0]
         pruned_model_iter_filename = f"pruned_iter_{iteration_num}_sparsity_{current_iteration_target_sparsity:.2f}.pth"
-        pruned_model_iter_dir = f"checkpoints/prune/{original_model_basename}"
+        pruned_model_iter_dir = os.path.join(
+            "checkpoints/prune", original_model_basename, str(iteration_num)
+        )
         os.makedirs(pruned_model_iter_dir, exist_ok=True)
-        pruned_model_iter_path = os.path.join(pruned_model_iter_dir, pruned_model_iter_filename)
-        
+        pruned_model_iter_path = os.path.join(
+            pruned_model_iter_dir, pruned_model_iter_filename
+        )
+
         torch.save(model.state_dict(), pruned_model_iter_path)
-        print(f"Pruned model (with masks) for iteration {iteration_num} saved to: {pruned_model_iter_path}")
-    
+        print(
+            f"Pruned model (with masks) for iteration {iteration_num} saved to: {pruned_model_iter_path}"
+        )
+
+        metrics_filename_stem = f"sparsity_{current_iteration_target_sparsity:.2f}"
+        metrics_csv_path = os.path.join(
+            pruned_model_iter_dir, f"{metrics_filename_stem}.csv"
+        )
+        plots_path = os.path.join(pruned_model_iter_dir, f"{metrics_filename_stem}.png")
+        save_metrics_plot(
+            epochs_range=range(1, len(iter_train_l) + 1),
+            train_losses=iter_train_l,
+            val_losses=iter_val_l,
+            val_accuracies=iter_val_acc,
+            val_mious=iter_val_miou,
+            plot_path=plots_path,
+        )
+        save_metrics_to_csv(
+            metrics_path=metrics_csv_path,
+            time_list=iter_times,
+            train_losses=iter_train_l,
+            val_losses=iter_val_l,
+            val_accuracies=iter_val_acc,
+            val_mious=iter_val_miou,
+            model_size=os.path.getsize(pruned_model_iter_path) / (1024 * 1024),
+        )
+        print(f"Iteration metrics saved to CSV: {metrics_csv_path}")
+        print(f"Iteration plots saved to PNG: {plots_path}")
+
     print("Making pruning permanent on the final model state...")
     make_pruning_permanent(model, prunable_layers)
-    
+
     final_macs, final_nparams = tp.utils.count_ops_and_params(model, example_inputs)
     final_sparsity = calculate_sparsity(model, prunable_layers)
     print(
@@ -325,24 +393,32 @@ def prune_main(args):
 
     print("Final validation of the permanently pruned model...")
     val_acc_final, miou_final, val_loss_final = validate(
-        model, val_loader, criterion, device_obj, config.num_classes, epoch=-1 
+        model, val_loader, criterion, device_obj, config.num_classes, epoch=-1
     )
     print(
         f"Permanently pruned model: Pixel Acc {val_acc_final:.4f}, mIoU {miou_final:.4f}, Loss {val_loss_final:.4f}"
     )
 
-    final_pruned_model_filename = f"pruned_final_sparsity_{final_sparsity:.2f}_miou_{miou_final:.3f}.pth"
-    final_pruned_model_path = os.path.join(pruned_model_iter_dir, final_pruned_model_filename)
+    final_pruned_model_filename = (
+        f"pruned_final_sparsity_{final_sparsity:.2f}_miou_{miou_final:.3f}.pth"
+    )
+    final_pruned_model_path = os.path.join(
+        pruned_model_iter_dir, final_pruned_model_filename
+    )
     torch.save(model.state_dict(), final_pruned_model_path)
     print(f"Final permanently pruned model saved to: {final_pruned_model_path}")
-    
+
     model_size_final_mb = os.path.getsize(final_pruned_model_path) / (1024 * 1024)
     print(f"Final pruned model size: {model_size_final_mb:.2f} MB")
 
     if all_iter_train_losses:
         overall_metrics_filename_stem = f"pruning_summary_{original_model_basename}"
-        overall_metrics_csv_path = os.path.join(pruned_model_iter_dir, f"{overall_metrics_filename_stem}.csv")
-        overall_plots_path = os.path.join(pruned_model_iter_dir, f"{overall_metrics_filename_stem}.png")
+        overall_metrics_csv_path = os.path.join(
+            pruned_model_iter_dir, f"{overall_metrics_filename_stem}.csv"
+        )
+        overall_plots_path = os.path.join(
+            pruned_model_iter_dir, f"{overall_metrics_filename_stem}.png"
+        )
         os.makedirs(os.path.dirname(overall_metrics_csv_path), exist_ok=True)
 
         save_metrics_plot(
@@ -364,7 +440,6 @@ def prune_main(args):
         )
         print(f"Overall pruning metrics saved to CSV: {overall_metrics_csv_path}")
         print(f"Overall pruning plots saved to PNG: {overall_plots_path}")
-
 
 
 def parse_args():

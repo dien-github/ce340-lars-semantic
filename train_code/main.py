@@ -134,7 +134,7 @@ def main(args):
     scaler = amp.GradScaler(enabled=(device_obj.type == "cuda"))
 
     # Training loop
-    patience = 7
+    patience = config.patience
     epochs_no_improve = 0
     train_losses, val_losses, val_accuracies, val_mious = [], [], [], []
     time_list = []
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     # Add an argument for model compilation if you want to control it
     parser.add_argument('--compile_model', action='store_true', help='Enable torch.compile for the model')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data loading.')
-    parser.add_argument('--patience', '-p', type=int, default=7, help='Early stopping patience for validation loss improvement.')
+    parser.add_argument('-p', '--patience', type=int, default=10, help='Early stopping patience for validation loss improvement.')
     args = parser.parse_args()
     
     main(args)
