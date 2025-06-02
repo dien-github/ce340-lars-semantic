@@ -130,6 +130,7 @@ def finetune(
     criterion = get_loss_function(
         config.loss_type, ce_weight=config.ce_weight, dice_weight=config.dice_weight
     )
+    criterion.to(device)
     scaler = torch.amp.GradScaler(enabled=(device.type == "cuda"))
     
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
