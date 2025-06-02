@@ -1,0 +1,28 @@
+run_id: 1
+base_model_name: best_model_20250529_1
+model_type: LRASPP-MobileNetV3
+num_classes: 3
+input_size: (320, 320)
+batch_size: 64
+epochs: 10
+learning_rate: 0.0001
+optimizer: Adam
+scheduler: OneCycleLR
+scheduler_params:
+    max_lr: 0.0001
+    steps_per_epoch: 41
+    epochs: 10
+    pct_start: 0.3
+    div_factor: 100.0
+    final_div_factor: 100.0
+    cycle_momentum: False
+seed: 2025
+dataset_path: /kaggle/input/lars-dataset
+train_dataset_size: 2605
+val_dataset_size: 198
+device: cuda
+cudnn_benchmark: True
+early_stopping_patience: 7
+best_model_path: checkpoints/train/20250529/best_model_20250529_1.pth
+metrics_path: output/train/20250529/best_model_20250529_1_metrics.csv
+plots_path: output/train/20250529/best_model_20250529_1_metrics.png
