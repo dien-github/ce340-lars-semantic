@@ -186,17 +186,18 @@ def main(args):
     print(f"Test dataset loaded: {len(test_dataset)} images.")
 
     # --- Load Model ---
-    model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
-    # model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
-    # model.load_state_dict(torch.load(model_path_to_test, map_location=device))
+    # model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
+    model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
+    model.load_state_dict(torch.load(model_path_to_test, map_location=device))
     state_dict = torch.load(model_path_to_test, map_location=device)
     new_state_dict = {}
     for k, v in state_dict.items():
-        if k.startswith('_orig_mod.'):
-            new_state_dict[k[len('_orig_mod.'):]] = v
+        if k.startswith("_orig_mod."):
+            new_state_dict[k[len("_orig_mod.") :]] = v
         else:
             new_state_dict[k] = v
     model.load_state_dict(new_state_dict)
+    # model = torch.load(model_path_to_test, map_location=device, weights_only=False)
     model.eval()
     if args.compile_model and hasattr(torch, "compile") and device.type == "cuda":
         print("Attempting to compile the model with torch.compile()...")
@@ -207,6 +208,10 @@ def main(args):
             print(f"Model compilation failed: {e}. Proceeding without compilation.")
 
     print(f"Model '{model_path_to_test}' loaded successfully.")
+                                                               
+    # --- Print number of parameters ---
+    num_params = sum(p.numel() for p in model.parameters())
+    print(f"Total number of parameters in the model: {num_params:,}")
 
     # --- Evaluation ---
     all_preds, all_targets = [], []
