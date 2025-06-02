@@ -230,7 +230,7 @@ def prune_main(args):
         pin_memory=(device_obj.type == "cuda"),
     )
     criterion = get_loss_function(
-        config.loss_type, ce_weight=config.ce_weight, dice_weight=config.dice_weight
+        config.loss_type, num_classes=config.num_classes, ce_weight=config.ce_weight, dice_weight=config.dice_weight, lap_weight=config.lap_weight
     )
     print("Validating model before pruning...")
     val_acc_before, miou_before, val_loss_before = validate(
