@@ -255,6 +255,7 @@ def prune_main(args):
         dice_weight=config.dice_weight,
         lap_weight=config.lap_weight,
     )
+    criterion.to(device_obj)
     print("Validating model before pruning...")
     val_acc_before, miou_before, val_loss_before = validate(
         model, val_loader, criterion, device_obj, config.num_classes, epoch=0
