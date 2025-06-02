@@ -11,25 +11,64 @@ from data.dataset import LaRSDataset
 from utils.losses import get_loss_function
 from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
-def apply_unstructured_pruning(model, target_sparsity, layers_to_prune):
+# def apply_unstructured_pruning(model, target_sparsity, layers_to_prune):
+#     """
+#     Apply unstructured pruning to the specified layers of the model.
+#     Args:
+#         model (torch.nn.Module): The model to prune.
+#         target_sparsity (float): The target sparsity level (between 0 and 1).
+#         layers_to_prune (list of tuples): List of tuples containing layer names and modules to prune.
+#     """
+#     for name, module in layers_to_prune:
+#         try:
+#             prune_utils.l1_unstructured(module, name="weight", amount=target_sparsity)
+#         except Exception as e:
+#             print(f"Could not prune {name} in {module}: {e}")
+#     return model
+
+def apply_iterative_unstructured_pruning(model, target_sparsity, layers_to_prune):
     """
-    Apply unstructured pruning to the specified layers of the model.
-    Args:
-        model (torch.nn.Module): The model to prune.
-        target_sparsity (float): The target sparsity level (between 0 and 1).
-        layers_to_prune (list of tuples): List of tuples containing layer names and modules to prune.
+    Apply incremental pruning to reach target sparsity.
     """
+    # Calculate current sparsity
+    current_sparsity = calculate_sparsity(model, layers_to_prune)
+    
+    if current_sparsity >= target_sparsity:
+        print(f"Already at target sparsity {current_sparsity:.4f} >= {target_sparsity:.4f}")
+        return model
+    
+    # Calculate incremental pruning amount
+    remaining_weights = 1 - current_sparsity  
+    target_removal = target_sparsity - current_sparsity
+    incremental_prune_ratio = target_removal / remaining_weights
+    
+    print(f"Current sparsity: {current_sparsity:.4f}")
+    print(f"Target sparsity: {target_sparsity:.4f}")  
+    print(f"Incremental prune ratio: {incremental_prune_ratio:.4f}")
+    
     for name, module in layers_to_prune:
         try:
-            prune_utils.l1_unstructured(module, name="weight", amount=target_sparsity)
+            prune_utils.l1_unstructured(module, name="weight", amount=incremental_prune_ratio)
         except Exception as e:
             print(f"Could not prune {name} in {module}: {e}")
+    
     return model
 
 def make_pruning_permanent(model, layers_to_prune):
+    """Make pruning permanent and clean up gradients."""
     for name, module in layers_to_prune:
         if prune_utils.is_pruned(module):
             prune_utils.remove(module, "weight")
+    
+    # Clear gradients to free memory
+    model.zero_grad()
+    
+    # Force garbage collection
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
     return model
 
 def get_prunable_layers(model, ignored_modules_list):
@@ -223,13 +262,13 @@ def prune_main(args):
     
     for i in range(args.iterative_steps):
         iteration_num = i + 1
-        model.train() 
+        model.train()
         print(f"Pruning iteration {iteration_num}/{args.iterative_steps}...")
 
         current_iteration_target_sparsity = args.target_prune_rate * (iteration_num / args.iterative_steps)
         
         print(f"Applying L1 unstructured pruning to target sparsity: {current_iteration_target_sparsity:.4f}")
-        apply_unstructured_pruning(model, current_iteration_target_sparsity, prunable_layers)
+        apply_iterative_unstructured_pruning(model, current_iteration_target_sparsity, prunable_layers)
 
         sparsity_after_masking = calculate_sparsity(model, prunable_layers)
         print(f"Sparsity after applying masks (iteration {iteration_num}): {sparsity_after_masking:.4f}")
