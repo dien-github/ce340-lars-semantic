@@ -257,6 +257,7 @@ if __name__ == "__main__":
     # Add an argument for model compilation if you want to control it
     parser.add_argument('--compile_model', action='store_true', help='Enable torch.compile for the model')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data loading.')
+    parser.add_argument('--patience', '-p', type=int, default=7, help='Early stopping patience for validation loss improvement.')
     args = parser.parse_args()
     
     main(args)
