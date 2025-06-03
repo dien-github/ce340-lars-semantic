@@ -50,7 +50,7 @@ def apply_structured_pruning_step(
     print(
         f"Applying structured pruning: global filter ratio = {channel_pruning_ratio:.4f}"
     )
-    pruner.step()  # prune in-place
+    pruner.step()
     return model_cpu.to(device)
 
 
@@ -393,7 +393,11 @@ def prune_main(args):
 
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
-    final_macs, final_params = tp.utils.count_ops_and_params(model, example_inputs)
+    model_cpu = model.cpu()
+    example_inputs_cpu = example_inputs.cpu()
+    final_macs, final_params = tp.utils.count_ops_and_params(
+        model_cpu, example_inputs_cpu
+    )
     final_param_reduction = (
         (base_nparams - final_params) / base_nparams if base_nparams > 0 else 0.0
     )
