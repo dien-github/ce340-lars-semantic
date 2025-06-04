@@ -429,6 +429,7 @@ def prune_main(args):
     torch.save(model.state_dict(), final_path)
 
     sample_inputs = (torch.randn(1, 3, 320, 320),)
+    sample_inputs = sample_inputs[0].to(device)
 
     torch.onnx.export(
         model,
