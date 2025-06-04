@@ -52,6 +52,7 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
     Validate the model on the validation dataset.
     Alternative validation with direct intersection/union accumulation.
     """
+    model = model.to(device)
     model.eval()
     correct_pixels, total_pixels, running_val_loss = 0, 0, 0.0
     class_intersection = torch.zeros(num_classes, dtype=torch.long, device=device)
