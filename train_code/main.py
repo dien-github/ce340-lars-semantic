@@ -115,9 +115,7 @@ def main(args):
     scheduler_max_lr = getattr(config, 'scheduler_max_lr', config.learning_rate)
     scheduler_epochs = config.epochs # Use config.epochs which might have been updated by args
     scheduler_pct_start = getattr(config, 'scheduler_pct_start', 0.3)
-    # The original code used div_factor=100, final_div_factor=100.
-    # PyTorch defaults are 25.0 and 1e4. Using configurable values:
-    scheduler_div_factor = getattr(config, 'scheduler_div_factor', 100.0)
+    scheduler_div_factor = getattr(config, 'scheduler_div_factor', 10.0)
     scheduler_final_div_factor = getattr(config, 'scheduler_final_div_factor', 100.0)
 
     scheduler = optim.lr_scheduler.OneCycleLR(
