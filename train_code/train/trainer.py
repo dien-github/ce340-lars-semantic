@@ -67,11 +67,13 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
             # Đảm bảo images là float32
             if images.dtype == torch.float16:
                 images = images.float()
-            with amp.autocast("cuda", enabled=(device.type == "cuda")):
-                outputs = model(images)["out"]
-                loss = criterion(outputs, masks)
+            # with amp.autocast("cuda", enabled=(device.type == "cuda")):
+            outputs = model(images)["out"]
+            loss = criterion(outputs, masks)
 
             _, predicted = torch.max(outputs, 1)
+
+            # Accumulate validation loss
             running_val_loss += loss.item() * images.size(0)
 
             # Accumulate pixel accuracy
@@ -110,12 +112,8 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
     for cls in range(num_classes):
         if class_union[cls] > 0:
             class_iou.append(class_intersection[cls].item() / class_union[cls].item())
-        else:
-            class_iou.append(0.0)
+    mean_iou = np.mean(class_iou) if class_iou else 0.0
 
-    # Calculate mean IoU
-    valid_ious = [iou for iou in class_iou if iou > 0]
-    mean_iou = np.mean(valid_ious) if valid_ious else 0.0
 
     # old
     # mean_iou = np.mean([np.mean(iou) if iou else 0 for iou in iou_scores])

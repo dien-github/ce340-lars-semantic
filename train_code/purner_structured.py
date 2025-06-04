@@ -89,6 +89,7 @@ def finetune(
     Fine-tune the pruned model for a given number of epochs.
     Returns metric lists for this session.
     """
+    model = model.to(device)
     model.train()
 
     train_dataset = LaRSDataset(
@@ -210,7 +211,7 @@ def prune_main(args):
         print(f"[Warning] Missing keys when loading model: {missing}")
         print(f"[Warning] Unexpected keys: {unexpected}")
     print("Model loaded successfully.")
-    model.to(device)
+    model = model.to(device)
 
     example_inputs = torch.randn(1, 3, *config.input_size).to(device)
     base_macs, base_nparams = tp.utils.count_ops_and_params(model, example_inputs)
@@ -286,6 +287,7 @@ def prune_main(args):
     base_save_dir = os.path.join("checkpoints", "prune_structured", original_basename)
     os.makedirs(base_save_dir, exist_ok=True)
 
+    model = model.to(device)
     for i in range(N_steps):
         iteration_num = i + 1
         print(f"\n========== Pruning iteration {iteration_num}/{N_steps} ==========")
@@ -416,8 +418,12 @@ def prune_main(args):
         f"Final model: Pixel Acc={val_acc_final:.4f}, mIoU={miou_final:.4f}, Loss={val_loss_final:.4f}"
     )
 
-    final_name = (f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth")
-    onnx_name = {f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.onnx"}
+    final_name = (
+        f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
+    )
+    onnx_name = {
+        f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.onnx"
+    }
     final_path = os.path.join(base_save_dir, final_name)
     # onnx_path = os.path.join(base_save_dir, onnx_name)
     torch.save(model.state_dict(), final_path)
@@ -430,7 +436,7 @@ def prune_main(args):
         onnx_name,
         input_names=["input"],
         output_names=["output"],
-        opset_version=11
+        opset_version=11,
     )
 
     model_size_mb = os.path.getsize(final_path) / (1024 * 1024)
