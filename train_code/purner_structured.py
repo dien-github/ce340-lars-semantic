@@ -84,6 +84,7 @@ def finetune(
     val_loader: DataLoader = None,
     device: torch.device = None,
     current_epoch_offset: int = 0,
+    best_model_save_path: str = None,  # New parameter
 ):
     """
     Fine-tune the pruned model for a given number of epochs.
@@ -134,8 +135,13 @@ def finetune(
     session_val_accuracies = []
     session_val_mious = []
 
+    best_miou_finetune = -1.0  # Initialize with a value lower than any possible mIoU
+    epochs_no_improve = 0
+    patience = getattr(config, 'patience', 10)  # Get patience from config, default to 10
+    path_to_best_model_saved_this_finetune = None
+
     for epoch in range(1, epochs + 1):
-        actual_epoch = current_epoch_offset + epoch
+        actual_epoch_num = current_epoch_offset + epoch
         time_taken, train_loss = train_one_epoch(
             model,
             train_loader,
@@ -143,12 +149,12 @@ def finetune(
             optimizer,
             device,
             scaler,
-            actual_epoch,
+            actual_epoch_num,
             scheduler,
         )
         if val_loader is not None:
             val_accuracy, val_miou, val_loss = validate(
-                model, val_loader, criterion, device, config.num_classes, actual_epoch
+                model, val_loader, criterion, device, config.num_classes, actual_epoch_num
             )
         else:
             val_accuracy, val_miou, val_loss = 0.0, 0.0, float("inf")
@@ -160,10 +166,29 @@ def finetune(
         session_val_mious.append(val_miou)
 
         print(
-            f"[Fine-tune] Epoch {epoch}/{epochs} (Global {actual_epoch}): "
+            f"[Fine-tune] Epoch {epoch}/{epochs} (Global {actual_epoch_num}): "
             f"Train Loss={train_loss:.4f}, Val Loss={val_loss:.4f}, "
             f"Val Acc={val_accuracy:.4f}, Val mIoU={val_miou:.4f}"
         )
+
+        # Early Stopping Logic & Save Best Model for this finetune session
+        if val_miou > best_miou_finetune:
+            best_miou_finetune = val_miou
+            epochs_no_improve = 0
+            if best_model_save_path:
+                os.makedirs(os.path.dirname(best_model_save_path), exist_ok=True)
+                if isinstance(model, torch.nn.DataParallel):
+                    torch.save(model.module.state_dict(), best_model_save_path)
+                else:
+                    torch.save(model.state_dict(), best_model_save_path)
+                path_to_best_model_saved_this_finetune = best_model_save_path
+                print(f"Saved best model for this finetune session at {best_model_save_path} with mIoU: {best_miou_finetune:.4f}")
+        else:
+            epochs_no_improve += 1
+            print(f"No improvement in mIoU for {epochs_no_improve} epochs during finetune.")
+        if epochs_no_improve >= patience:
+            print(f"Early stopping triggered after {patience} epochs without improvement in finetune session.")
+            break # Exit the finetune epoch loop
 
     print("Fine-tuning for this iteration completed.")
     return (
@@ -172,6 +197,7 @@ def finetune(
         session_val_losses,
         session_val_accuracies,
         session_val_mious,
+        path_to_best_model_saved_this_finetune
     )
 
 
@@ -293,6 +319,12 @@ def prune_main(args):
         print(f"\n========== Pruning iteration {iteration_num}/{N_steps} ==========")
         model.train()
 
+        # Define save path for the best model of this finetuning iteration (model with masks)
+        iter_save_dir = os.path.join(base_save_dir, f"iter_{iteration_num}")
+        os.makedirs(iter_save_dir, exist_ok=True) # Ensure iter_save_dir exists before using it
+        best_model_finetune_iter_filename = f"best_finetune_iter{iteration_num}.pth" # Simplified name for now
+        best_model_finetune_iter_path = os.path.join(iter_save_dir, best_model_finetune_iter_filename)
+
         model = apply_structured_pruning_step(
             model=model,
             channel_pruning_ratio=r_step,
@@ -316,21 +348,22 @@ def prune_main(args):
         )
 
         print(f"Fine-tuning for {args.epochs} epochs (Iteration {iteration_num}) ...")
-        epoch_offset = i * args.epochs
+        finetune_epoch_offset = i * args.epochs
         (
             iter_times,
             iter_train_losses,
             iter_val_losses,
             iter_val_accuracies,
             iter_val_mious,
+            path_to_best_model_this_iter_finetune,
         ) = finetune(
             model=model,
             config=config,
             epochs=args.epochs,
             val_loader=val_loader,
             device=device,
-            current_epoch_offset=epoch_offset,
-        )
+            current_epoch_offset=finetune_epoch_offset,
+            best_model_save_path=best_model_finetune_iter_path )
         all_times.extend(iter_times)
         all_train_losses.extend(iter_train_losses)
         all_val_losses.extend(iter_val_losses)
@@ -338,13 +371,21 @@ def prune_main(args):
         all_val_mious.extend(iter_val_mious)
 
         print(f"Validating after fine-tune iteration {iteration_num} ...")
+        # Load the best model from this finetuning session before validation and next step
+        if path_to_best_model_this_iter_finetune and os.path.exists(path_to_best_model_this_iter_finetune):
+            print(f"Loading best model from finetune iteration {iteration_num}: {path_to_best_model_this_iter_finetune}")
+            best_state_dict_iter = torch.load(path_to_best_model_this_iter_finetune, map_location=device)
+            model.load_state_dict(best_state_dict_iter)
+            model.to(device) # Ensure model is on correct device
+        else:
+            print(f"No best model saved during finetune for iteration {iteration_num}. Using model state at end of finetuning.")
         val_acc_after, miou_after, val_loss_after = validate(
             model,
             val_loader,
             criterion,
             device,
             config.num_classes,
-            epoch=epoch_offset + args.epochs,
+            epoch=finetune_epoch_offset + len(iter_train_losses), # Use actual epochs run
         )
         print(
             f"[Iteration {iteration_num}] Pixel Acc={val_acc_after:.4f}, "
@@ -358,15 +399,17 @@ def prune_main(args):
             )
             break
 
-        iter_save_dir = os.path.join(base_save_dir, f"iter_{iteration_num}")
-        os.makedirs(iter_save_dir, exist_ok=True)
+        # The best model from finetune (path_to_best_model_this_iter_finetune) is already saved.
+        # We might want to rename it or save another copy with more pruning info if needed,
+        # but for now, we'll use the one saved by finetune.
+        # The model state in `model` variable is now the best from finetune.
         pruned_model_name = (
             f"pruned_iter{iteration_num}_paramRed_{reduced_params:.2f}.pth"
         )
         pruned_model_path = os.path.join(iter_save_dir, pruned_model_name)
         torch.save(model.state_dict(), pruned_model_path)
         print(
-            f"Saved pruned model for iteration {iteration_num} at: {pruned_model_path}"
+            f"Saved (best from finetune) model for iteration {iteration_num} at: {pruned_model_path}"
         )
 
         metrics_stem = f"metrics_iter{iteration_num}_paramRed_{reduced_params:.2f}"
@@ -395,7 +438,9 @@ def prune_main(args):
 
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
-    model_cpu = model.cpu()
+    # make_pruning_permanent moves to CPU, ensure it's back on device for final validation
+    model = model.to(device)
+    model_cpu = model.cpu() # For MACs/Params count on CPU
     example_inputs_cpu = example_inputs.cpu()
     final_macs, final_params = tp.utils.count_ops_and_params(
         model_cpu, example_inputs_cpu
@@ -411,6 +456,7 @@ def prune_main(args):
     )
 
     print("Validating model after permanent pruning ...")
+    model.to(device) # Ensure model is on device for validation
     val_acc_final, miou_final, val_loss_final = validate(
         model, val_loader, criterion, device, config.num_classes, epoch=-1
     )
@@ -421,20 +467,20 @@ def prune_main(args):
     final_name = (
         f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
     )
-    onnx_name = {
+    onnx_filename = (
         f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.onnx"
-    }
+    )
     final_path = os.path.join(base_save_dir, final_name)
-    # onnx_path = os.path.join(base_save_dir, onnx_name)
+    onnx_path = os.path.join(base_save_dir, onnx_filename)
+
     torch.save(model.state_dict(), final_path)
 
-    sample_inputs = (torch.randn(1, 3, 320, 320),)
-    sample_inputs = sample_inputs[0].to(device)
+    sample_inputs_onnx = example_inputs.cpu() # ONNX export often prefers CPU inputs
 
     torch.onnx.export(
-        model,
-        sample_inputs,
-        onnx_name,
+        model.cpu(), # Export CPU version of the model
+        sample_inputs_onnx,
+        onnx_path,
         input_names=["input"],
         output_names=["output"],
         opset_version=11,
