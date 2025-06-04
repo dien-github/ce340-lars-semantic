@@ -1,4 +1,3 @@
-import ai_edge_torch
 import argparse
 import os
 import torch
@@ -418,14 +417,21 @@ def prune_main(args):
     )
 
     final_name = (f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth")
-    tflite_name = {f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.tflite"}
+    onnx_name = {f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.onnx"}
     final_path = os.path.join(base_save_dir, final_name)
-    tflite_name = os.path.join(base_save_dir, tflite_name)
+    # onnx_path = os.path.join(base_save_dir, onnx_name)
     torch.save(model.state_dict(), final_path)
 
-    sample_inputs = (torch.randn(1, 3, 320, 320).to(device),)
-    edge_model = ai_edge_torch.convert(model, sample_inputs)
-    edge_model.export(tflite_name)
+    sample_inputs = (torch.randn(1, 3, 320, 320),)
+
+    torch.onnx.export(
+        model,
+        sample_inputs,
+        onnx_name,
+        input_names=["input"],
+        output_names=["output"],
+        opset_version=11
+    )
 
     model_size_mb = os.path.getsize(final_path) / (1024 * 1024)
     print(f"Saved final pruned model at: {final_path} ({model_size_mb:.2f} MB)")
