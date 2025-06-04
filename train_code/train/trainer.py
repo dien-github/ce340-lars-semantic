@@ -67,9 +67,9 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
             # Đảm bảo images là float32
             if images.dtype == torch.float16:
                 images = images.float()
-            # with amp.autocast("cuda", enabled=(device.type == "cuda")):
-            outputs = model(images)["out"]
-            loss = criterion(outputs, masks)
+            with amp.autocast("cuda", enabled=(device.type == "cuda")):
+                outputs = model(images)["out"]
+                loss = criterion(outputs, masks)
 
             _, predicted = torch.max(outputs, 1)
             running_val_loss += loss.item() * images.size(0)
