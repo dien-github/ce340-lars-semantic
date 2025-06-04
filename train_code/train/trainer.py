@@ -61,11 +61,11 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
 
     with torch.no_grad():
         loop = tqdm(dataloader, total=len(dataloader), desc=f"[Val] Epoch {epoch}")
-
         for images, masks in loop:
             images, masks = images.to(device), masks.to(device)
-            if masks.dim() == 4 and masks.size(1) == 1:
-                masks = masks.squeeze(1)
+            # Đảm bảo images là float32
+            if images.dtype == torch.float16:
+                images = images.float()
             with amp.autocast("cuda", enabled=(device.type == "cuda")):
                 outputs = model(images)["out"]
                 loss = criterion(outputs, masks)
