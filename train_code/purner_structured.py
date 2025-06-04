@@ -6,6 +6,7 @@ from model.deeplab import get_lraspp_model
 from config import Config
 from train.trainer import validate, train_one_epoch
 from torch.utils.data import DataLoader
+from data.augmentation import get_training_augmentations, get_validation_augmentations
 from data.dataset import LaRSDataset
 from utils.losses import get_loss_function
 from utils.plotting import save_metrics_plot, save_metrics_to_csv
@@ -93,11 +94,12 @@ def finetune(
     model = model.to(device)
     model.train()
 
+    train_transform = get_training_augmentations(target_size=config.input_size)
     train_dataset = LaRSDataset(
         image_dir=config.train_dataset_path,
         image_names=config.train_names,
         mask_dir=config.train_mask_path,
-        transform=None,
+        transform=train_transform,
         target_size=config.input_size,
     )
     train_loader = DataLoader(
@@ -242,11 +244,12 @@ def prune_main(args):
     example_inputs = torch.randn(1, 3, *config.input_size).to(device)
     base_macs, base_nparams = tp.utils.count_ops_and_params(model, example_inputs)
 
+    val_transform = get_validation_augmentations(target_size=config.input_size)
     val_dataset = LaRSDataset(
         image_dir=config.val_dataset_path,
         image_names=config.val_names,
         mask_dir=config.val_mask_path,
-        transform=None,
+        transform=val_transform,
         target_size=config.input_size,
     )
     val_loader = DataLoader(
