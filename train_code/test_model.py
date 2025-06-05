@@ -94,19 +94,31 @@ def mask_to_rgb(mask, color_palette):
     return rgb_mask.cpu().numpy()
 
 
-def plot_confusion_matrix(cm, class_names, output_path):
+def plot_confusion_matrix(cm, class_names, output_path, normalize=False):
     plt.figure(figsize=(10, 8))
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        xticklabels=class_names,
-        yticklabels=class_names,
-    )
+    if normalize:
+        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        sns.heatmap(
+            cm_normalized,
+            annot=True,
+            fmt=".2f",  # Format as float for normalized
+            cmap="Blues",
+            xticklabels=class_names,
+            yticklabels=class_names,
+        )
+        plt.title("Normalized Confusion Matrix")
+    else:
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",  # Format as integer for standard
+            cmap="Blues",
+            xticklabels=class_names,
+            yticklabels=class_names,
+        )
+        plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
-    plt.title("Confusion Matrix")
     plt.savefig(output_path)
     plt.close()
     print(f"Confusion matrix saved to {output_path}")
@@ -326,9 +338,8 @@ def summarize_results(
     cm = confusion_matrix(
         all_targets_np, all_preds_np, labels=list(range(cfg.num_classes))
     )
-    plot_confusion_matrix(
-        cm, class_names, os.path.join(output_base_dir, "confusion_matrix.png")
-    )
+    plot_confusion_matrix(cm, class_names, os.path.join(output_base_dir, "confusion_matrix.png"), normalize=False)
+    plot_confusion_matrix(cm, class_names, os.path.join(output_base_dir, "confusion_matrix_normalized.png"), normalize=True)
 
     # IoU Distribution
     plot_iou_distribution(
@@ -336,6 +347,23 @@ def summarize_results(
         class_names,
         os.path.join(output_base_dir, "iou_distribution.png"),
     )
+
+    # --- Calculate and Display Precision and Recall per class ---
+    print("\n--- Precision and Recall per Class ---")
+    precision_per_class = []
+    recall_per_class = []
+    for i in range(cfg.num_classes):
+        tp = cm[i, i]
+        fp = cm[:, i].sum() - tp
+        fn = cm[i, :].sum() - tp
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        precision_per_class.append(precision)
+        recall_per_class.append(recall)
+        print(f"Class {class_names[i]}:")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall:    {recall:.4f}")
 
     # Visual inspection of worst cases (stress test)
     print("\nWorst performing images (by mean IoU):")
@@ -376,6 +404,11 @@ def summarize_results(
     req_size_pass = model_size_mb <= args.req_model_size
     req_latency_pass = avg_latency_ms <= args.req_latency
 
+    # Calculate normFPS, F1 (using mean_dice_coefficient), and score
+    norm_fps = fps / 10.0
+    f1_score = mean_dice_coefficient # For semantic segmentation, F1 is often equivalent to Dice
+    score = (2 * norm_fps * f1_score) / (norm_fps + f1_score) if (norm_fps + f1_score) > 0 else 0.0
+
     print("\n--- Test Results ---")
     print(f"Model: {model_path_to_test}")
     print(f"Pixel Accuracy: {pixel_accuracy:.4f}")
@@ -389,6 +422,12 @@ def summarize_results(
     print(f"Model Size: {model_size_mb:.2f} MB")
     print(f"Average Latency: {avg_latency_ms:.2f} ms/image")
     print(f"Inference Speed: {fps:.2f} FPS")
+
+    print("\n--- Custom Score Metrics ---")
+    print(f"FPS: {fps:.2f}")
+    print(f"F1 Score (Mean Dice): {f1_score:.4f}")
+    print(f"normFPS (FPS/10): {norm_fps:.2f}")
+    print(f"Score (2*normFPS*F1 / (normFPS+F1)): {score:.4f}")
 
     print("\n--- Requirement Checks ---")
     print(
@@ -416,8 +455,10 @@ def summarize_results(
         "Req_Size_Pass",
         "Req_Latency_Pass",
     ]
+    # Add headers for per-class IoU, Dice, Precision, Recall
     for i in range(cfg.num_classes):
-        csv_header.extend([f"IoU_Class{i}", f"Dice_Class{i}"])
+        csv_header.extend([f"IoU_Class{i}", f"Dice_Class{i}",
+                           f"Precision_Class{i}", f"Recall_Class{i}"])
 
     csv_row = [
         os.path.splitext(os.path.basename(model_path_to_test))[0],
@@ -432,8 +473,10 @@ def summarize_results(
         req_size_pass,
         req_latency_pass,
     ]
+    # Add values for per-class IoU, Dice, Precision, Recall
     for i in range(cfg.num_classes):
-        csv_row.extend([mean_iou_per_class[i], mean_dice_per_class[i]])
+        csv_row.extend([mean_iou_per_class[i], mean_dice_per_class[i],
+                        precision_per_class[i], recall_per_class[i]])
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
