@@ -140,10 +140,11 @@ def plot_iou_distribution(per_class_iou_all_images, class_names, output_path):
         print("No IoU data to plot for distribution.")
         return
 
-    plt.boxplot(data_to_plot, tick_labels=labels_to_plot)  # Sửa ở đây
+    plt.boxplot(data_to_plot)
     plt.xlabel("Class")
     plt.ylabel("IoU Score")
     plt.title("IoU Distribution per Class")
+    plt.xticks(ticks=np.arange(1, len(labels_to_plot) + 1), labels=labels_to_plot, rotation=45, ha="right")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
     plt.savefig(output_path)
