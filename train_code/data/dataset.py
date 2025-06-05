@@ -25,32 +25,34 @@ class LaRSDataset(Dataset):
             image = Image.open(image_path).convert("RGB")
             mask = Image.open(mask_path).convert("L") # Load as grayscale
         except FileNotFoundError:
-            # Consider logging this error or handling it more gracefully
-            print(f"Warning: File not found for image_id {image_id} at {image_path} or {mask_path}")
+            print(f"Warning: File not found: {image_path} or {mask_path}")
             return None, None
 
         if self.target_size:
             image = image.resize(self.target_size, Image.BILINEAR)
             mask = mask.resize(self.target_size, Image.NEAREST)
-        
+
         return image, mask
 
     def __getitem__(self, idx):
         image_id = self.image_names[idx]
         image_pil, mask_pil = self._load_image_mask_pil(image_id)
 
-        if image_pil is None or mask_pil is None:
-            # _load_image_mask_pil already prints a warning.
-            # Raising an error here helps to catch data issues early.
-            raise FileNotFoundError(f"Image or mask PIL object is None for ID: {image_id}. "
-                                    "This might be due to a file not found or other loading issue.")
+        if image_pil is None:
+            raise FileNotFoundError(f"Image or mask not found for ID {image_id}")
 
-        image_tensor = transforms.ToTensor()(image_pil) # Convert PIL image to tensor
-        if self.transform: # Apply additional transforms if any (e.g., normalization)
-            image_tensor = self.transform(image_tensor)
+        # Convert PIL images to NumPy array
+        image_np = np.array(image_pil)
+        mask_np = np.array(mask_pil, dtype=np.int64)
+        mask_np[mask_np == 255] = 0  # thay ignore index thành background (0)
 
-        mask_numpy = np.array(mask_pil, dtype=np.int64)
-        mask_numpy[mask_numpy == 255] = 0  # Replace ignore index (255) with a valid class (e.g., 0 for background)
-        mask_tensor = torch.from_numpy(mask_numpy)
+        if self.transform:
+            augmented = self.transform(image=image_np, mask=mask_np)
+            image_tensor = augmented['image']       # đã là torch.Tensor
+            mask_tensor = augmented['mask'].long()  # đảm bảo dtype = long
+        else:
+            # Nếu không dùng Albumentations, fallback về ToTensor cho image, mask chỉ convert sang Tensor
+            image_tensor = transforms.ToTensor()(image_pil)
+            mask_tensor = torch.from_numpy(mask_np).long()
 
         return image_tensor, mask_tensor

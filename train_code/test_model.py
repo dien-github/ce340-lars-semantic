@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.amp as amp
 from torch.utils.data import DataLoader
-from PIL import Image
+# from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -18,7 +18,6 @@ from config import Config
 from data.dataset import LaRSDataset
 from model.deeplab import get_deeplab_model, get_lraspp_model
 
-# Constants for test data (adjust if your structure is different)
 TEST_DATA_ROOT = "/home/grace/Documents/ce340-lars-semantic/lars"
 
 
@@ -87,27 +86,41 @@ def get_color_palette(num_classes):
 
 def mask_to_rgb(mask, color_palette):
     """Converts a segmentation mask to an RGB image using a color palette."""
+    # Ensure color_palette is on the same device as the mask
+    palette_on_mask_device = color_palette.to(mask.device)
     rgb_mask = torch.zeros(
         (mask.size(0), mask.size(1), 3), dtype=torch.uint8, device=mask.device
     )
-    for cls_idx, color in enumerate(color_palette):
+    for cls_idx, color in enumerate(palette_on_mask_device): # Use palette on correct device
         rgb_mask[mask == cls_idx] = color
     return rgb_mask.cpu().numpy()
 
 
-def plot_confusion_matrix(cm, class_names, output_path):
+def plot_confusion_matrix(cm, class_names, output_path, normalize=False):
     plt.figure(figsize=(10, 8))
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        xticklabels=class_names,
-        yticklabels=class_names,
-    )
+    if normalize:
+        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        sns.heatmap(
+            cm_normalized,
+            annot=True,
+            fmt=".2f",  # Format as float for normalized
+            cmap="Blues",
+            xticklabels=class_names,
+            yticklabels=class_names,
+        )
+        plt.title("Normalized Confusion Matrix")
+    else:
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",  # Format as integer for standard
+            cmap="Blues",
+            xticklabels=class_names,
+            yticklabels=class_names,
+        )
+        plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
-    plt.title("Confusion Matrix")
     plt.savefig(output_path)
     plt.close()
     print(f"Confusion matrix saved to {output_path}")
@@ -127,10 +140,11 @@ def plot_iou_distribution(per_class_iou_all_images, class_names, output_path):
         print("No IoU data to plot for distribution.")
         return
 
-    plt.boxplot(data_to_plot, tick_labels=labels_to_plot)  # Sửa ở đây
+    plt.boxplot(data_to_plot)
     plt.xlabel("Class")
     plt.ylabel("IoU Score")
     plt.title("IoU Distribution per Class")
+    plt.xticks(ticks=np.arange(1, len(labels_to_plot) + 1), labels=labels_to_plot, rotation=45, ha="right")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
     plt.savefig(output_path)
@@ -138,58 +152,12 @@ def plot_iou_distribution(per_class_iou_all_images, class_names, output_path):
     print(f"IoU distribution plot saved to {output_path}")
 
 
-def main(args):
-    cfg = Config()
-
-    # --- Setup ---
-    torch.manual_seed(cfg.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(cfg.seed)
-    torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
-    torch.backends.cudnn.deterministic = not cfg.cudnn_benchmark
-
-    device = torch.device(cfg.device)
-
-    model_path_to_test = args.model_path
-    if not os.path.exists(model_path_to_test):
-        print(f"Error: Model path not found: {model_path_to_test}")
-        return
-
-    model_name_tested = os.path.splitext(os.path.basename(model_path_to_test))[0]
-    output_base_dir = os.path.join("output", "test", cfg.date_str, model_name_tested)
-    visual_output_dir = os.path.join(output_base_dir, "visual_examples")
-    os.makedirs(visual_output_dir, exist_ok=True)
-
-    # --- Load Test Data ---
-    try:
-        test_images_dir, test_masks_dir, test_image_names = get_test_data_paths(
-            args.test_data_root
-        )
-    except FileNotFoundError as e:
-        print(f"Error loading test data: {e}")
-        return
-
-    test_dataset = LaRSDataset(
-        image_dir=test_images_dir,
-        image_names=test_image_names,
-        mask_dir=test_masks_dir,
-        transform=None,  # Normalization can be added here if model expects it
-        target_size=cfg.input_size,
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,  # Use a batch size suitable for inference
-        shuffle=False,
-        num_workers=args.num_workers,
-        pin_memory=True if device.type == "cuda" else False,
-    )
-    print(f"Test dataset loaded: {len(test_dataset)} images.")
-
-    # --- Load Model ---
-    # model = get_deeplab_model(num_classes=cfg.num_classes, device=device)
-    model = get_lraspp_model(num_classes=cfg.num_classes, device=device)
-    model.load_state_dict(torch.load(model_path_to_test, map_location=device))
-    state_dict = torch.load(model_path_to_test, map_location=device)
+def load_model(model_path, num_classes, device, use_lraspp=True):
+    if use_lraspp:
+        model = get_lraspp_model(num_classes=num_classes, device=device)
+    else:
+        model = get_deeplab_model(num_classes=num_classes, device=device)
+    state_dict = torch.load(model_path, map_location=device)
     new_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith("_orig_mod."):
@@ -197,23 +165,16 @@ def main(args):
         else:
             new_state_dict[k] = v
     model.load_state_dict(new_state_dict)
-    # model = torch.load(model_path_to_test, map_location=device, weights_only=False)
     model.eval()
-    if args.compile_model and hasattr(torch, "compile") and device.type == "cuda":
-        print("Attempting to compile the model with torch.compile()...")
-        try:
-            model = torch.compile(model)
-            print("Model compiled successfully.")
-        except Exception as e:
-            print(f"Model compilation failed: {e}. Proceeding without compilation.")
+    return model
 
-    print(f"Model '{model_path_to_test}' loaded successfully.")
-                                                               
-    # --- Print number of parameters ---
-    num_params = sum(p.numel() for p in model.parameters())
-    print(f"Total number of parameters in the model: {num_params:,}")
 
-    # --- Evaluation ---
+def evaluate_model(
+    model, test_loader, cfg, args, device, visual_output_dir, test_dataset
+):
+    # Ensure the model is on the correct device at the beginning of evaluation
+    model.to(device)
+
     all_preds, all_targets = [], []
     per_class_iou_all_images = [[] for _ in range(cfg.num_classes)]
     per_class_dice_all_images = [[] for _ in range(cfg.num_classes)]
@@ -231,10 +192,7 @@ def main(args):
             dummy_input = torch.randn(
                 args.batch_size, 3, *cfg.input_size, device=device
             )
-            with (
-                torch.no_grad(),
-                amp.autocast(device.type, enabled=(device.type == "cuda")),
-            ):
+            with torch.no_grad():
                 _ = model(dummy_input)
         torch.cuda.synchronize()
 
@@ -249,8 +207,7 @@ def main(args):
             if device.type == "cuda":
                 torch.cuda.synchronize()
 
-            with amp.autocast(device.type, enabled=(device.type == "cuda")):
-                outputs = model(images)["out"]
+            outputs = model(images)["out"]
 
             if device.type == "cuda":
                 torch.cuda.synchronize()
@@ -331,6 +288,32 @@ def main(args):
                     )
                     plt.close()
 
+    return (
+        all_preds,
+        all_targets,
+        per_class_iou_all_images,
+        per_class_dice_all_images,
+        total_inference_time,
+        num_processed_images,
+        worst_iou_images,
+    )
+
+
+def summarize_results(
+    cfg,
+    args,
+    model_path_to_test,
+    all_preds,
+    all_targets,
+    per_class_iou_all_images,
+    per_class_dice_all_images,
+    total_inference_time,
+    num_processed_images,
+    worst_iou_images,
+    output_base_dir,
+    visual_output_dir,
+    test_dataset,
+):
     all_preds_np = np.concatenate([p.reshape(-1) for p in all_preds])
     all_targets_np = np.concatenate([t.reshape(-1) for t in all_targets])
 
@@ -360,9 +343,8 @@ def main(args):
     cm = confusion_matrix(
         all_targets_np, all_preds_np, labels=list(range(cfg.num_classes))
     )
-    plot_confusion_matrix(
-        cm, class_names, os.path.join(output_base_dir, "confusion_matrix.png")
-    )
+    plot_confusion_matrix(cm, class_names, os.path.join(output_base_dir, "confusion_matrix.png"), normalize=False)
+    plot_confusion_matrix(cm, class_names, os.path.join(output_base_dir, "confusion_matrix_normalized.png"), normalize=True)
 
     # IoU Distribution
     plot_iou_distribution(
@@ -371,8 +353,26 @@ def main(args):
         os.path.join(output_base_dir, "iou_distribution.png"),
     )
 
+    # --- Calculate and Display Precision and Recall per class ---
+    print("\n--- Precision and Recall per Class ---")
+    precision_per_class = []
+    recall_per_class = []
+    for i in range(cfg.num_classes):
+        tp = cm[i, i]
+        fp = cm[:, i].sum() - tp
+        fn = cm[i, :].sum() - tp
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        precision_per_class.append(precision)
+        recall_per_class.append(recall)
+        print(f"Class {class_names[i]}:")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall:    {recall:.4f}")
+
     # Visual inspection of worst cases (stress test)
     print("\nWorst performing images (by mean IoU):")
+    color_palette = get_color_palette(cfg.num_classes)
     for iou_val, img_id, pred_m, gt_m in worst_iou_images:
         print(f"  Image ID: {img_id}, Mean IoU: {iou_val:.4f}")
         # Save these specific worst cases
@@ -409,6 +409,11 @@ def main(args):
     req_size_pass = model_size_mb <= args.req_model_size
     req_latency_pass = avg_latency_ms <= args.req_latency
 
+    # Calculate normFPS, F1 (using mean_dice_coefficient), and score
+    norm_fps = fps / 10.0
+    f1_score = mean_dice_coefficient # For semantic segmentation, F1 is often equivalent to Dice
+    score = (2 * norm_fps * f1_score) / (norm_fps + f1_score) if (norm_fps + f1_score) > 0 else 0.0
+
     print("\n--- Test Results ---")
     print(f"Model: {model_path_to_test}")
     print(f"Pixel Accuracy: {pixel_accuracy:.4f}")
@@ -422,6 +427,12 @@ def main(args):
     print(f"Model Size: {model_size_mb:.2f} MB")
     print(f"Average Latency: {avg_latency_ms:.2f} ms/image")
     print(f"Inference Speed: {fps:.2f} FPS")
+
+    print("\n--- Custom Score Metrics ---")
+    print(f"FPS: {fps:.2f}")
+    print(f"F1 Score (Mean Dice): {f1_score:.4f}")
+    print(f"normFPS (FPS/10): {norm_fps:.2f}")
+    print(f"Score (2*normFPS*F1 / (normFPS+F1)): {score:.4f}")
 
     print("\n--- Requirement Checks ---")
     print(
@@ -449,11 +460,13 @@ def main(args):
         "Req_Size_Pass",
         "Req_Latency_Pass",
     ]
+    # Add headers for per-class IoU, Dice, Precision, Recall
     for i in range(cfg.num_classes):
-        csv_header.extend([f"IoU_Class{i}", f"Dice_Class{i}"])
+        csv_header.extend([f"IoU_Class{i}", f"Dice_Class{i}",
+                           f"Precision_Class{i}", f"Recall_Class{i}"])
 
     csv_row = [
-        model_name_tested,
+        os.path.splitext(os.path.basename(model_path_to_test))[0],
         cfg.date_str,
         pixel_accuracy,
         mIoU,
@@ -465,8 +478,10 @@ def main(args):
         req_size_pass,
         req_latency_pass,
     ]
+    # Add values for per-class IoU, Dice, Precision, Recall
     for i in range(cfg.num_classes):
-        csv_row.extend([mean_iou_per_class[i], mean_dice_per_class[i]])
+        csv_row.extend([mean_iou_per_class[i], mean_dice_per_class[i],
+                        precision_per_class[i], recall_per_class[i]])
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
@@ -474,15 +489,90 @@ def main(args):
         writer.writerow(csv_row)
     print(f"\nTest summary saved to: {csv_path}")
 
-    # Auto-run sum.py after test
+
+def auto_run_sum_py(output_base_dir):
     sum_script = "/home/grace/Documents/ce340-lars-semantic/output/sum.py"
     try:
         subprocess.run([sys.executable, sum_script], check=True)
         print("Auto-summarized all test_summary.csv files.")
     except Exception as e:
         print(f"Failed to run sum.py: {e}")
-
     print(f"\nVisualizations and detailed logs saved in: {output_base_dir}")
+
+
+def main(args):
+    cfg = Config()
+
+    # --- Setup ---
+    torch.manual_seed(cfg.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(cfg.seed)
+    torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
+    torch.backends.cudnn.deterministic = not cfg.cudnn_benchmark
+
+    device = torch.device(cfg.device)
+
+    model_path_to_test = args.model_path
+    if not os.path.exists(model_path_to_test):
+        print(f"Error: Model path not found: {model_path_to_test}")
+        return
+
+    model_name_tested = os.path.splitext(os.path.basename(model_path_to_test))[0]
+    output_base_dir = os.path.join("output", "test", cfg.date_str, model_name_tested)
+    visual_output_dir = os.path.join(output_base_dir, "visual_examples")
+    os.makedirs(visual_output_dir, exist_ok=True)
+
+    # --- Load Test Data ---
+    try:
+        test_images_dir, test_masks_dir, test_image_names = get_test_data_paths(
+            args.test_data_root
+        )
+    except FileNotFoundError as e:
+        print(f"Error loading test data: {e}")
+        return
+
+    test_dataset = LaRSDataset(
+        image_dir=test_images_dir,
+        image_names=test_image_names,
+        mask_dir=test_masks_dir,
+        transform=None,  # Normalization can be added here if model expects it
+        target_size=cfg.input_size,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,  # Use a batch size suitable for inference
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True if device.type == "cuda" else False,
+    )
+    print(f"Test dataset loaded: {len(test_dataset)} images.")
+
+    # --- Load Model ---
+    model = load_model(model_path_to_test, cfg.num_classes, device, use_lraspp=True)
+    if args.compile_model and hasattr(torch, "compile") and device.type == "cuda":
+        print("Attempting to compile the model with torch.compile()...")
+        try:
+            model = torch.compile(model)
+            print("Model compiled successfully.")
+        except Exception as e:
+            print(f"Model compilation failed: {e}. Proceeding without compilation.")
+
+    print(f"Model '{model_path_to_test}' loaded successfully.")
+                                                               
+    # --- Print number of parameters ---
+    num_params = sum(p.numel() for p in model.parameters())
+    print(f"Total number of parameters in the model: {num_params:,}")
+
+    # --- Evaluation ---
+    all_preds, all_targets, per_class_iou_all_images, per_class_dice_all_images, total_inference_time, num_processed_images, worst_iou_images = evaluate_model(
+        model, test_loader, cfg, args, device, visual_output_dir, test_dataset
+    )
+    summarize_results(
+        cfg, args, model_path_to_test, all_preds, all_targets, per_class_iou_all_images,
+        per_class_dice_all_images, total_inference_time, num_processed_images,
+        worst_iou_images, output_base_dir, visual_output_dir, test_dataset
+    )
+    auto_run_sum_py(output_base_dir)
 
 
 if __name__ == "__main__":

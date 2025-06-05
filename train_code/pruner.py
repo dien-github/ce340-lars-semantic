@@ -135,7 +135,11 @@ def finetune(
         filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate
     )
     criterion = get_loss_function(
-        config.loss_type, num_classes=config.num_classes, ce_weight=config.ce_weight, dice_weight=config.dice_weight, lap_weight=config.lap_weight
+        config.loss_type,
+        num_classes=config.num_classes,
+        ce_weight=config.ce_weight,
+        dice_weight=config.dice_weight,
+        lap_weight=config.lap_weight,
     )
     criterion.to(device)
     scaler = torch.amp.GradScaler(enabled=(device.type == "cuda"))

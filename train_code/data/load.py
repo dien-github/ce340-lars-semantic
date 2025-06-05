@@ -1,15 +1,19 @@
 from torch.utils.data import DataLoader
 # from torchvision import transforms # Added for potential normalization
 from data.dataset import LaRSDataset
+from data.augmentation import get_training_augmentations, get_validation_augmentations
 
 def load_datasets(config):
-    image_transforms = None # Example:
+    # Take transforms for train and val
+    train_transforms = get_training_augmentations(target_size=config.input_size)
+    val_transforms = get_validation_augmentations(target_size=config.input_size)
 
+    # Create datasets
     train_dataset = LaRSDataset(
         image_dir=config.train_dataset_path,
         image_names=config.train_names, # Use property from config
         mask_dir=config.train_mask_path,
-        transform=image_transforms,
+        transform=train_transforms,
         target_size=config.input_size,
     )
 
@@ -17,7 +21,7 @@ def load_datasets(config):
         image_dir=config.val_dataset_path,
         image_names=config.val_names, # Use property from config
         mask_dir=config.val_mask_path,
-        transform=image_transforms, # Apply same non-augmenting transforms to val
+        transform=val_transforms, # Apply same non-augmenting transforms to val
         target_size=config.input_size,
     )
 
