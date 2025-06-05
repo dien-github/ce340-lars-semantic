@@ -51,7 +51,7 @@ class FSCNN_MobileNetV3(nn.Module):
 
         # The number of channels for 'out' and 'low_level' are fixed for MobileNetV3Large
         inplanes = 960  # Output channels of backbone.features[16]
-        low_level_inplanes = 160  # Output channels of backbone.features[12]
+        low_level_inplanes = 112  # Output channels of backbone.features[12]
 
         self.classifier = FCNHead(inplanes, num_classes)
 
