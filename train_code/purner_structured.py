@@ -563,11 +563,11 @@ def parse_args():
     parser.add_argument(
         "--max_map_drop",
         type=float,
-        default=0.2,
+        default=0.1,
         help="Maximum allowed mIoU drop relative to the original.",
     )
     parser.add_argument(
-        "--batch_size", type=int, default=8, help="Batch size for test/eval."
+        "--batch_size", type=int, default=32, help="Batch size for test/eval."
     )
     parser.add_argument(
         "--num_workers", type=int, default=4, help="Num workers for test/eval."
@@ -580,10 +580,10 @@ def parse_args():
     )
     parser.add_argument("--req_miou", type=float, default=0.9, help="Required mIoU.")
     parser.add_argument(
-        "--req_model_size", type=float, default=5.0, help="Required model size in MB."
+        "--req_model_size", type=float, default=4.0, help="Required model size in MB."
     )
     parser.add_argument(
-        "--req_latency", type=float, default=200.0, help="Required latency in ms."
+        "--req_latency", type=float, default=20.0, help="Required latency in ms."
     )
     return parser.parse_args()
 
