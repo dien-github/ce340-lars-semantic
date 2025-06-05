@@ -86,10 +86,12 @@ def get_color_palette(num_classes):
 
 def mask_to_rgb(mask, color_palette):
     """Converts a segmentation mask to an RGB image using a color palette."""
+    # Ensure color_palette is on the same device as the mask
+    palette_on_mask_device = color_palette.to(mask.device)
     rgb_mask = torch.zeros(
         (mask.size(0), mask.size(1), 3), dtype=torch.uint8, device=mask.device
     )
-    for cls_idx, color in enumerate(color_palette):
+    for cls_idx, color in enumerate(palette_on_mask_device): # Use palette on correct device
         rgb_mask[mask == cls_idx] = color
     return rgb_mask.cpu().numpy()
 
@@ -169,6 +171,9 @@ def load_model(model_path, num_classes, device, use_lraspp=True):
 def evaluate_model(
     model, test_loader, cfg, args, device, visual_output_dir, test_dataset
 ):
+    # Ensure the model is on the correct device at the beginning of evaluation
+    model.to(device)
+
     all_preds, all_targets = [], []
     per_class_iou_all_images = [[] for _ in range(cfg.num_classes)]
     per_class_dice_all_images = [[] for _ in range(cfg.num_classes)]
