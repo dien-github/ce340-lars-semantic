@@ -14,11 +14,8 @@ class Config:
     patience = 7
     input_size = (320, 320)
     model_type = "lraspp"  # "lraspp" or "deeplab"
-    freeze_layers = None  # None, "backbone", "classifier", or "all"
-    unfreeze_layers = [
-        "backbone",
-        "classifier",
-    ]  # None, "backbone", "classifier", or "all"
+    freeze_layers = ["backbone"]  # None, "backbone", "classifier", or "all"
+    unfreeze_layers = ["classifier"]  # None, "backbone", "classifier", or "all"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     loss_type = "combined"  # cross_entropy, dice, or combined
     ce_weight = 1.0  # Weight for cross-entropy loss
