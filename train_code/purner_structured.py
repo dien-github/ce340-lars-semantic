@@ -309,16 +309,14 @@ def prune_main(args):
         lap_weight=config.lap_weight,
     ).to(device)
     print("Validating model before pruning ...")
-    # TODO
-    # Uncomment the following lines if you want to validate before pruning
-    # val_acc_before, miou_before, val_loss_before = validate(
-    #     model, val_loader, criterion, device, config.num_classes, epoch=0
-    # )
+    val_acc_before, miou_before, val_loss_before = validate(
+        model, val_loader, criterion, device, config.num_classes, epoch=0
+    )
     print("=== Before pruning ===")
     print(f"MACs={base_macs / 1e9:.4f}G, Params={base_nparams / 1e6:.4f}M")
-    # print(
-    #     f"Pixel Acc={val_acc_before:.4f}, mIoU={miou_before:.4f}, Loss={val_loss_before:.4f}"
-    # )
+    print(
+        f"Pixel Acc={val_acc_before:.4f}, mIoU={miou_before:.4f}, Loss={val_loss_before:.4f}"
+    )
     ignored_parent_modules = []
     if hasattr(model, "classifier"):
         ignored_parent_modules.append(model.classifier)
@@ -384,92 +382,92 @@ def prune_main(args):
             f"After prune {iteration_num}: MACs={current_macs / 1e9:.4f}G (-{reduced_macs * 100:.2f}%), Params={current_params / 1e6:.4f}M (-{reduced_params * 100:.2f}%)"
         )
 
-        # print(f"Fine-tuning for {args.epochs} epochs (Iteration {iteration_num}) ...")
-        # finetune_epoch_offset = i * args.epochs
-        # (
-        #     iter_times,
-        #     iter_train_losses,
-        #     iter_val_losses,
-        #     iter_val_accuracies,
-        #     iter_val_mious,
-        #     path_to_best_model_this_iter_finetune,
-        # ) = finetune(
-        #     model=model,
-        #     config=config,
-        #     epochs=args.epochs,
-        #     val_loader=val_loader,
-        #     device=device,
-        #     current_epoch_offset=finetune_epoch_offset,
-        #     best_model_save_path=best_model_finetune_iter_path,
-        # )
-        # all_times.extend(iter_times)
-        # all_train_losses.extend(iter_train_losses)
-        # all_val_losses.extend(iter_val_losses)
-        # all_val_accuracies.extend(iter_val_accuracies)
-        # all_val_mious.extend(iter_val_mious)
-        # print(f"Validating after fine-tune iteration {iteration_num} ...")
-        # if path_to_best_model_this_iter_finetune and os.path.exists(
-        #     path_to_best_model_this_iter_finetune
-        # ):
-        #     print(
-        #         f"Loading best model from finetune iteration {iteration_num}: {path_to_best_model_this_iter_finetune}"
-        #     )
-        #     best_state_dict_iter = torch.load(
-        #         path_to_best_model_this_iter_finetune, map_location=device
-        #     )
-        #     model.load_state_dict(best_state_dict_iter)
-        #     model.to(device)
-        # else:
-        #     print(
-        #         f"No best model saved during finetune for iteration {iteration_num}. Using model state at end of finetuning."
-        #     )
-        # val_acc_after, miou_after, val_loss_after = validate(
-        #     model,
-        #     val_loader,
-        #     criterion,
-        #     device,
-        #     config.num_classes,
-        #     epoch=finetune_epoch_offset + len(iter_train_losses),
-        # )
-        # print(
-        #     f"[Iteration {iteration_num}] Pixel Acc={val_acc_after:.4f}, mIoU={miou_after:.4f}, Loss={val_loss_after:.4f}"
-        # )
-        # if miou_after < (1 - args.max_map_drop) * miou_before:
-        #     print(
-        #         f"[Warning] mIoU ({miou_after:.4f}) dropped below threshold compared to original ({miou_before:.4f}). Stopping at iteration {iteration_num}."
-        #     )
-        #     break
-        # pruned_model_name = (
-        #     f"pruned_iter{iteration_num}_paramRed_{reduced_params:.2f}.pth"
-        # )
-        # pruned_model_path = os.path.join(iter_save_dir, pruned_model_name)
-        # torch.save(model.state_dict(), pruned_model_path)
-        # print(
-        #     f"Saved (best from finetune) model for iteration {iteration_num} at: {pruned_model_path}"
-        # )
-        # metrics_stem = f"metrics_iter{iteration_num}_paramRed_{reduced_params:.2f}"
-        # csv_path = os.path.join(iter_save_dir, f"{metrics_stem}.csv")
-        # plot_path = os.path.join(iter_save_dir, f"{metrics_stem}.png")
-        # save_metrics_plot(
-        #     epochs_range=range(1, len(iter_train_losses) + 1),
-        #     train_losses=iter_train_losses,
-        #     val_losses=iter_val_losses,
-        #     val_accuracies=iter_val_accuracies,
-        #     val_mious=iter_val_mious,
-        #     plot_path=plot_path,
-        # )
-        # save_metrics_to_csv(
-        #     metrics_path=csv_path,
-        #     time_list=iter_times,
-        #     train_losses=iter_train_losses,
-        #     val_losses=iter_val_losses,
-        #     val_accuracies=iter_val_accuracies,
-        #     val_mious=iter_val_mious,
-        #     model_size=os.path.getsize(pruned_model_path) / (1024 * 1024),
-        # )
-        # print(
-        #     f"Metrics for iteration {iteration_num} saved: CSV at {csv_path}, PNG at {plot_path}"
-        # )
+        print(f"Fine-tuning for {args.epochs} epochs (Iteration {iteration_num}) ...")
+        finetune_epoch_offset = i * args.epochs
+        (
+            iter_times,
+            iter_train_losses,
+            iter_val_losses,
+            iter_val_accuracies,
+            iter_val_mious,
+            path_to_best_model_this_iter_finetune,
+        ) = finetune(
+            model=model,
+            config=config,
+            epochs=args.epochs,
+            val_loader=val_loader,
+            device=device,
+            current_epoch_offset=finetune_epoch_offset,
+            best_model_save_path=best_model_finetune_iter_path,
+        )
+        all_times.extend(iter_times)
+        all_train_losses.extend(iter_train_losses)
+        all_val_losses.extend(iter_val_losses)
+        all_val_accuracies.extend(iter_val_accuracies)
+        all_val_mious.extend(iter_val_mious)
+        print(f"Validating after fine-tune iteration {iteration_num} ...")
+        if path_to_best_model_this_iter_finetune and os.path.exists(
+            path_to_best_model_this_iter_finetune
+        ):
+            print(
+                f"Loading best model from finetune iteration {iteration_num}: {path_to_best_model_this_iter_finetune}"
+            )
+            best_state_dict_iter = torch.load(
+                path_to_best_model_this_iter_finetune, map_location=device
+            )
+            model.load_state_dict(best_state_dict_iter)
+            model.to(device)
+        else:
+            print(
+                f"No best model saved during finetune for iteration {iteration_num}. Using model state at end of finetuning."
+            )
+        val_acc_after, miou_after, val_loss_after = validate(
+            model,
+            val_loader,
+            criterion,
+            device,
+            config.num_classes,
+            epoch=finetune_epoch_offset + len(iter_train_losses),
+        )
+        print(
+            f"[Iteration {iteration_num}] Pixel Acc={val_acc_after:.4f}, mIoU={miou_after:.4f}, Loss={val_loss_after:.4f}"
+        )
+        if miou_after < (1 - args.max_map_drop) * miou_before:
+            print(
+                f"[Warning] mIoU ({miou_after:.4f}) dropped below threshold compared to original ({miou_before:.4f}). Stopping at iteration {iteration_num}."
+            )
+            break
+        pruned_model_name = (
+            f"pruned_iter{iteration_num}_paramRed_{reduced_params:.2f}.pth"
+        )
+        pruned_model_path = os.path.join(iter_save_dir, pruned_model_name)
+        torch.save(model.state_dict(), pruned_model_path)
+        print(
+            f"Saved (best from finetune) model for iteration {iteration_num} at: {pruned_model_path}"
+        )
+        metrics_stem = f"metrics_iter{iteration_num}_paramRed_{reduced_params:.2f}"
+        csv_path = os.path.join(iter_save_dir, f"{metrics_stem}.csv")
+        plot_path = os.path.join(iter_save_dir, f"{metrics_stem}.png")
+        save_metrics_plot(
+            epochs_range=range(1, len(iter_train_losses) + 1),
+            train_losses=iter_train_losses,
+            val_losses=iter_val_losses,
+            val_accuracies=iter_val_accuracies,
+            val_mious=iter_val_mious,
+            plot_path=plot_path,
+        )
+        save_metrics_to_csv(
+            metrics_path=csv_path,
+            time_list=iter_times,
+            train_losses=iter_train_losses,
+            val_losses=iter_val_losses,
+            val_accuracies=iter_val_accuracies,
+            val_mious=iter_val_mious,
+            model_size=os.path.getsize(pruned_model_path) / (1024 * 1024),
+        )
+        print(
+            f"Metrics for iteration {iteration_num} saved: CSV at {csv_path}, PNG at {plot_path}"
+        )
         
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
