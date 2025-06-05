@@ -201,8 +201,7 @@ def evaluate_model(
             if device.type == "cuda":
                 torch.cuda.synchronize()
 
-            with amp.autocast(device.type, enabled=(device.type == "cuda")):
-                outputs = model(images)["out"]
+            outputs = model(images)["out"]
 
             if device.type == "cuda":
                 torch.cuda.synchronize()
