@@ -5,7 +5,15 @@ import torch.amp as amp
 
 
 def train_one_epoch(
-    model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None
+    model,
+    dataloader,
+    criterion,
+    optimizer,
+    device,
+    scaler,
+    epoch,
+    scheduler=None,
+    model_type="lraspp",
 ):
     model.train()
     running_loss = 0.0
@@ -22,7 +30,10 @@ def train_one_epoch(
         with amp.autocast(
             "cuda", enabled=(device.type == "cuda")
         ):  # Automatic Mixed Precision
-            outputs = model(images)["out"]
+            if (model_type == "lraspp") or (model_type == "deeplab"):
+                outputs = model(images)["out"]
+            else:
+                outputs = model(images)
             loss = criterion(outputs, masks)
 
         # Scales loss. Calls backward() on scaled loss to create scaled gradients.
@@ -113,7 +124,6 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
         if class_union[cls] > 0:
             class_iou.append(class_intersection[cls].item() / class_union[cls].item())
     mean_iou = np.mean(class_iou) if class_iou else 0.0
-
 
     # old
     # mean_iou = np.mean([np.mean(iou) if iou else 0 for iou in iou_scores])

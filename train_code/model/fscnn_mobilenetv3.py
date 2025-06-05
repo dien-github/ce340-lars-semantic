@@ -6,7 +6,7 @@ from torchvision.models._utils import IntermediateLayerGetter
 
 # Conditional import for MobileNetV3Large_Weights for broader compatibility
 try:
-    from torchvision.models import MobileNetV3Large_Weights
+    from torchvision.models import MobileNet_V3_Large_Weights
 
     _use_new_weights_api = True
 except ImportError:
@@ -27,7 +27,7 @@ class FSCNN_MobileNetV3(nn.Module):
 
         if pretrained_backbone:
             if _use_new_weights_api:
-                weights = MobileNetV3Large_Weights.DEFAULT
+                weights = MobileNet_V3_Large_Weights.DEFAULT
                 # Use pretrained=False and then load weights explicitly if DEFAULT is not available
                 # or rely on pretrained=True if it works for your torchvision version
                 # For simplicity, stick to pretrained=True for older versions and weights=DEFAULT for newer
@@ -100,6 +100,7 @@ def get_fscnn_mobilenetv3_model(
     model = FSCNN_MobileNetV3(
         num_classes=num_classes, pretrained_backbone=pretrained_backbone
     )
+    # print(model)
 
     if freeze_layers:
         for name, param in model.named_parameters():

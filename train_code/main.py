@@ -59,9 +59,13 @@ def main(args):
         model = get_fscnn_mobilenetv3_model(
             num_classes=config.num_classes,
             device=device_obj,
-            pretrained_backbone=True,  # You can make this configurable in Config if needed
-            freeze_layers=None,  # Configure as needed
-            unfreeze_layers=None,  # Configure as needed
+            pretrained_backbone=True,
+            freeze_layers=["backbone"],  # Freeze backbone
+            unfreeze_layers=[
+                "classifier",
+                "conv_low_level",
+                "concat_conv",
+            ],  # Fine-tune head
         )
         model_name = "FSCNN-MobileNetV3"
     else:
