@@ -3,10 +3,17 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models.segmentation.fcn import FCNHead
 from torchvision.models._utils import IntermediateLayerGetter
-# from torchvision.models.segmentation.deeplabv3 import DeepLabV3 # Can remove if not used
-# from torchvision.models.segmentation.lraspp import LRASPP # Can remove if not used
-# Remove the problematic import
-# from torchvision.models import MobileNetV3Large_Weights # <--- REMOVE THIS LINE
+
+# Conditional import for MobileNetV3Large_Weights for broader compatibility
+try:
+    from torchvision.models import MobileNetV3Large_Weights
+
+    _use_new_weights_api = True
+except ImportError:
+    _use_new_weights_api = False
+    print(
+        "Warning: MobileNetV3Large_Weights not found. Using pretrained=True for backward compatibility."
+    )
 
 
 class FSCNN_MobileNetV3(nn.Module):
@@ -18,18 +25,33 @@ class FSCNN_MobileNetV3(nn.Module):
     def __init__(self, num_classes, pretrained_backbone=True):
         super(FSCNN_MobileNetV3, self).__init__()
 
-        # Load MobileNetV3Large using the 'pretrained' boolean argument
-        # This is compatible with older torchvision versions.
-        backbone = models.mobilenet_v3_large(
-            pretrained=pretrained_backbone, dilated=True
-        )  # <--- MODIFIED LINE
+        if pretrained_backbone:
+            if _use_new_weights_api:
+                weights = MobileNetV3Large_Weights.DEFAULT
+                # Use pretrained=False and then load weights explicitly if DEFAULT is not available
+                # or rely on pretrained=True if it works for your torchvision version
+                # For simplicity, stick to pretrained=True for older versions and weights=DEFAULT for newer
+                backbone = models.mobilenet_v3_large(weights=weights, dilated=True)
+            else:
+                backbone = models.mobilenet_v3_large(pretrained=True, dilated=True)
+        else:
+            backbone = models.mobilenet_v3_large(dilated=True)
 
-        return_layers = {"features.16": "out", "features.12": "low_level"}
+        # Corrected way to get features for IntermediateLayerGetter
+        # Pass backbone.features directly, and use integer indices for return_layers
+        # because backbone.features is an nn.Sequential
+        return_layers = {
+            "12": "low_level",  # Corresponds to backbone.features[12]
+            "16": "out",  # Corresponds to backbone.features[16]
+        }
 
-        self.backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
+        self.backbone_features = IntermediateLayerGetter(
+            backbone.features, return_layers=return_layers
+        )  # <--- MODIFIED LINE HERE
 
-        inplanes = 960
-        low_level_inplanes = 160
+        # The number of channels for 'out' and 'low_level' are fixed for MobileNetV3Large
+        inplanes = 960  # Output channels of backbone.features[16]
+        low_level_inplanes = 160  # Output channels of backbone.features[12]
 
         self.classifier = FCNHead(inplanes, num_classes)
 
@@ -40,7 +62,10 @@ class FSCNN_MobileNetV3(nn.Module):
 
     def forward(self, x):
         input_shape = x.shape[-2:]
-        features = self.backbone(x)
+        # Get features from the IntermediateLayerGetter on the backbone.features
+        features = self.backbone_features(
+            x
+        )  # <--- MODIFIED HERE (calling backbone_features)
 
         x = features["out"]
         x = self.classifier(x)
