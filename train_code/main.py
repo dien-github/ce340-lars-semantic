@@ -249,7 +249,7 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--batch_size', type=int, help='Batch size for training')
     parser.add_argument('-e', '--epochs', type=int, help='Number of epochs to train')
     parser.add_argument('--backbone', type=str, help='Backbone model to use')
-    parser.add_argument('learning_rate', type=float, help='Learning rate for the optimizer')
+    parser.add_argument('--learning_rate', type=float, help='Learning rate for the optimizer')
     parser.add_argument('--seed', type=int, default=2025, help='Random seed for reproducibility')
     parser.add_argument('--loss_type', type=str, choices=['cross_entropy', 'dice', 'combined'], help='Type of loss function to use')
     # Add an argument for model compilation if you want to control it
