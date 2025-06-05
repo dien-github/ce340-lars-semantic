@@ -186,7 +186,7 @@ def evaluate_model(
             dummy_input = torch.randn(
                 args.batch_size, 3, *cfg.input_size, device=device
             )
-            with torch.no_grad(), amp.autocast(device.type, enabled=(device.type == "cuda")):
+            with torch.no_grad():
                 _ = model(dummy_input)
         torch.cuda.synchronize()
 
