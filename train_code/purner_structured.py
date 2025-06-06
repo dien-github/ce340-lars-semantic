@@ -173,7 +173,7 @@ def finetune(
     )
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.batch_size,
+        batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
@@ -398,7 +398,7 @@ def prune_main(args):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.batch_size,
+        batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
