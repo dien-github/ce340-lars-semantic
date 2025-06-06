@@ -187,3 +187,8 @@ lars.zip
 inference-env/
 tflite_micro_runtime-1.2.2-cp39-cp39-linux_armv6l.whl
 sample_evaluation_semantic.zip
+checkpoints/
+output/
+inference_code/
+train_code/temp/
+temp/

@@ -11,7 +11,7 @@ class Config:
     batch_size = 32
     num_workers = 4
     epochs = 20
-    learning_rate = 1e-4
+    learning_rate = 1e-3
     patience = 7
     input_size = (320, 320)
     model_type = "lraspp"  # "lraspp" or "deeplab"
