@@ -175,7 +175,7 @@ def finetune(
         train_dataset,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=getattr(config, "num_workers", 4),
+        num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )
     optimizer = torch.optim.Adam(
@@ -400,7 +400,7 @@ def prune_main(args):
         val_dataset,
         batch_size=config.batch_size,
         shuffle=False,
-        num_workers=getattr(config, "num_workers", 4),
+        num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )
 
