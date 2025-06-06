@@ -65,6 +65,7 @@ def collect_ignored_conv_layers(model, ignored_parent_modules):
 
 
 def finetune(
+    args,
     model,
     config,
     epochs,
@@ -115,7 +116,7 @@ def finetune(
     session_val_accuracies, session_val_mious = [], []
     best_miou_finetune = -1.0
     epochs_no_improve = 0
-    patience = getattr(config, "patience", 10)
+    patience = args.patience if hasattr(args, "patience") else 7
     path_to_best_model_saved_this_finetune = None
     for epoch in range(1, epochs + 1):
         actual_epoch_num = current_epoch_offset + epoch
@@ -392,6 +393,7 @@ def prune_main(args):
             iter_val_mious,
             path_to_best_model_this_iter_finetune,
         ) = finetune(
+            args=args,
             model=model,
             config=config,
             epochs=args.epochs,
@@ -583,6 +585,7 @@ def parse_args():
     parser.add_argument(
         "--req_latency", type=float, default=20.0, help="Required latency in ms."
     )
+    parser.add_argument("--patience", type=int, default=7, help="Early stopping patience.")
     return parser.parse_args()
 
 
