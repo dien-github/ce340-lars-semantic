@@ -5,6 +5,7 @@ import torch_pruning as tp
 import torch.nn.utils.prune as prune
 from torch.utils.data import DataLoader
 
+from torchinfo import summary
 from model.deeplab import get_lraspp_model
 from config import Config
 from train.trainer import validate, train_one_epoch
@@ -310,7 +311,13 @@ def prune_main(args):
     print("Model loaded successfully.")
     model = model.to(device)
     example_inputs = torch.randn(1, 3, *config.input_size).to(device)
-    base_macs, base_nparams = tp.utils.count_ops_and_params(model, example_inputs)
+
+    info = summary(model, input_size=(1, 3, *config.input_size), verbose=0)
+    base_macs = info.total_mult_adds
+    base_params = info.total_params
+
+
+    # base_macs, base_params = tp.utils.count_ops_and_params(model, example_inputs)
     val_transform = get_validation_augmentations(target_size=config.input_size)
     val_dataset = LaRSDataset(
         image_dir=config.val_dataset_path,
@@ -338,7 +345,7 @@ def prune_main(args):
         model, val_loader, criterion, device, config.num_classes, epoch=0
     )
     print("=== Before pruning ===")
-    print(f"MACs={base_macs / 1e9:.4f}G, Params={base_nparams / 1e6:.4f}M")
+    print(f"MACs={base_macs / 1e9:.4f}G, Params={base_params / 1e6:.4f}M")
     print(
         f"Pixel Acc={val_acc_before:.4f}, mIoU={miou_before:.4f}, Loss={val_loss_before:.4f}"
     )
@@ -367,13 +374,7 @@ def prune_main(args):
     print(f"Target overall prune rate: {R_total:.4f}")
     print(f"Iterative steps: {N_steps}")
     print(f"→ Prune rate per step: {r_step:.4f}")
-    all_times, all_train_losses, all_val_losses, all_val_accuracies, all_val_mious = (
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
+    all_times, all_train_losses, all_val_losses, all_val_accuracies, all_val_mious = ([], [], [], [], [],)
     original_basename = os.path.splitext(os.path.basename(model_path))[0]
     base_save_dir = os.path.join("checkpoints", "prune_structured", original_basename)
     os.makedirs(base_save_dir, exist_ok=True)
@@ -394,11 +395,14 @@ def prune_main(args):
             ignored_layers=ignored_layers,
             importance_measure=2,
         )
-        current_macs, current_params = tp.utils.count_ops_and_params(
-            model, example_inputs
-        )
+        info = summary(model, input_size=(1, 3, *config.input_size), verbose=0)
+        current_macs = info.total_mult_adds
+        current_params = info.total_params
+        # current_macs, current_params = tp.utils.count_ops_and_params(
+        #     model, example_inputs
+        # )
         reduced_params = (
-            (base_nparams - current_params) / base_nparams if base_nparams > 0 else 0.0
+            (base_params - current_params) / base_params if base_params > 0 else 0.0
         )
         reduced_macs = (base_macs - current_macs) / base_macs if base_macs > 0 else 0.0
         print(
@@ -498,12 +502,16 @@ def prune_main(args):
 
     model = model.to(device)
     model_cpu = model.cpu()
-    example_inputs_cpu = example_inputs.cpu()
-    final_macs, final_params = tp.utils.count_ops_and_params(
-        model_cpu, example_inputs_cpu
-    )
+    # example_inputs_cpu = example_inputs.cpu()
+    
+    info = summary(model_cpu, input_size=(1, 3, *config.input_size), verbose=0)
+    final_macs = info.total_mult_adds
+    final_params = info.total_params
+    # final_macs, final_params = tp.utils.count_ops_and_params(
+    #     model_cpu, example_inputs_cpu
+    # )
     final_param_reduction = (
-        (base_nparams - final_params) / base_nparams if base_nparams > 0 else 0.0
+        (base_params - final_params) / base_params if base_params > 0 else 0.0
     )
     final_mac_reduction = (base_macs - final_macs) / base_macs if base_macs > 0 else 0.0
     print(
