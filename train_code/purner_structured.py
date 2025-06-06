@@ -1,5 +1,5 @@
 import argparse
-import intel_extension_for_pytorch as ipex
+# import intel_extension_for_pytorch as ipex
 import os
 import torch
 import torch.nn as nn
@@ -207,9 +207,9 @@ def finetune(
     path_to_best_model_saved_this_finetune = None
 
     # Tối ưu hóa với IPEX
-    if config.use_ipex:
-        print("Using Intel Extension for PyTorch (IPEX) for optimization...")
-        model, optimizer = ipex.optimize(model, optimizer)
+    # if config.use_ipex:
+    #     print("Using Intel Extension for PyTorch (IPEX) for optimization...")
+    #     model, optimizer = ipex.optimize(model, optimizer)
 
     for epoch in range(1, epochs + 1):
         actual_epoch_num = current_epoch_offset + epoch
