@@ -3,9 +3,10 @@ import tflite_micro_runtime.interpreter as tflite
 
 from nms import non_max_suppression_yolov8
 
+
 class Model(object):
     def __init__(self, model_path):
-        #super.__init__()
+        # super.__init__()
         self.interpreter = tflite.Interpreter(model_path=model_path)
         self.interpreter.allocate_tensors()
 
@@ -52,14 +53,16 @@ class Model(object):
             center_y = raw_box[1]
             w = raw_box[2]
             h = raw_box[3]
-            class_scores = raw_box[self.BOX_COORD_NUM:]
+            class_scores = raw_box[self.BOX_COORD_NUM :]
             for index, score in enumerate(class_scores):
-                if (score > self.score_threshold):
+                if score > self.score_threshold:
                     boxes.append([center_x, center_y, w, h, score, index])
 
-        clean_boxes = non_max_suppression_yolov8(boxes, self.class_count, self.keypoint_count)
+        clean_boxes = non_max_suppression_yolov8(
+            boxes, self.class_count, self.keypoint_count
+        )
 
-        #return clean_boxes
+        # return clean_boxes
         results = []
 
         for box in clean_boxes:
