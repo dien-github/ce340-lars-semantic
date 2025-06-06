@@ -4,9 +4,7 @@ import torch
 import torch.amp as amp
 
 
-def train_one_epoch(
-    model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None
-):
+def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None):
     model.train()
     running_loss = 0.0
     loop = tqdm(

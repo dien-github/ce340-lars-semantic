@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 import torch_pruning as tp
+import torch.nn.utils.prune as prune
 from torch.utils.data import DataLoader
 
 from model.deeplab import get_lraspp_model
@@ -14,45 +15,68 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 from test_model import get_test_data_paths, evaluate_model, summarize_results
 
 
+# def apply_structured_pruning_step(
+#     model,
+#     channel_pruning_ratio,
+#     example_inputs,
+#     device,
+#     ignored_layers=None,
+#     importance_measure="L1",
+# ):
+#     if not (0 < channel_pruning_ratio < 1):
+#         print("channel_pruning_ratio is out of (0,1), skipping pruning step.")
+#         return model
+#     model_cpu = model.cpu()
+#     example_inputs_cpu = example_inputs.cpu()
+#     if importance_measure == "L1":
+#         imp = tp.importance.MagnitudeImportance(p=1)
+#     elif importance_measure == "L2":
+#         imp = tp.importance.MagnitudeImportance(p=2)
+#     elif importance_measure == "Random":
+#         imp = tp.importance.RandomImportance()
+#     else:
+#         raise ValueError(f"Unsupported importance_measure: {importance_measure}")
+#     pruner = tp.pruner.MagnitudePruner(
+#         model=model_cpu,
+#         example_inputs=example_inputs_cpu,
+#         importance=imp,
+#         pruning_ratio=channel_pruning_ratio,
+#         ignored_layers=ignored_layers or [],
+#     )
+#     # for module in model.backbone.modules():
+#     #     if isinstance(module, torch.nn.Conv2d):
+#     #         prune.ln_structured(module, name="weight", amount=0.2, n=2, dim=0)
+
+#     print(
+#         f"Applying structured pruning: global filter ratio = {channel_pruning_ratio:.4f}"
+#     )
+#     pruner.step()
+#     return model_cpu.to(device)
+
+
 def apply_structured_pruning_step(
-    model,
-    channel_pruning_ratio,
-    example_inputs,
-    device,
-    ignored_layers=None,
-    importance_measure="L1",
+    model, ignored_layers, channel_pruning_ratio, importance_measure=2
 ):
-    if not (0 < channel_pruning_ratio < 1):
-        print("channel_pruning_ratio is out of (0,1), skipping pruning step.")
-        return model
-    model_cpu = model.cpu()
-    example_inputs_cpu = example_inputs.cpu()
-    if importance_measure == "L1":
-        imp = tp.importance.MagnitudeImportance(p=1)
-    elif importance_measure == "L2":
-        imp = tp.importance.MagnitudeImportance(p=2)
-    elif importance_measure == "Random":
-        imp = tp.importance.RandomImportance()
-    else:
-        raise ValueError(f"Unsupported importance_measure: {importance_measure}")
-    pruner = tp.pruner.MagnitudePruner(
-        model=model_cpu,
-        example_inputs=example_inputs_cpu,
-        importance=imp,
-        pruning_ratio=channel_pruning_ratio,
-        ignored_layers=ignored_layers or [],
-    )
+    for module in model.backbone.modules():
+        if isinstance(module, torch.nn.Conv2d):
+            if ignored_layers is not None and module in ignored_layers:
+                continue
+            prune.ln_structured(
+                module,
+                name="weight",
+                amount=channel_pruning_ratio,
+                n=importance_measure,
+                dim=0,
+            )
     print(
         f"Applying structured pruning: global filter ratio = {channel_pruning_ratio:.4f}"
     )
-    pruner.step()
-    return model_cpu.to(device)
 
 
 def make_pruning_permanent(model):
-    model_cpu = model.cpu()
+    prune.remove(model, name="weight")
     torch.cuda.empty_cache()
-    return model_cpu
+    return model
 
 
 def collect_ignored_conv_layers(model, ignored_parent_modules):
@@ -367,10 +391,8 @@ def prune_main(args):
         model = apply_structured_pruning_step(
             model=model,
             channel_pruning_ratio=r_step,
-            example_inputs=example_inputs,
-            device=device,
             ignored_layers=ignored_layers,
-            importance_measure="L1",
+            importance_measure=2,
         )
         current_macs, current_params = tp.utils.count_ops_and_params(
             model, example_inputs
@@ -470,9 +492,10 @@ def prune_main(args):
         print(
             f"Metrics for iteration {iteration_num} saved: CSV at {csv_path}, PNG at {plot_path}"
         )
-        
+
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
+
     model = model.to(device)
     model_cpu = model.cpu()
     example_inputs_cpu = example_inputs.cpu()
@@ -494,7 +517,9 @@ def prune_main(args):
     print(
         f"Final model: Pixel Acc={val_acc_final:.4f}, mIoU={miou_final:.4f}, Loss={val_loss_final:.4f}"
     )
-    final_name = f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
+    final_name = (
+        f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
+    )
     final_path, onnx_path, model_size_mb = export_and_save(
         model,
         example_inputs,
@@ -585,7 +610,9 @@ def parse_args():
     parser.add_argument(
         "--req_latency", type=float, default=20.0, help="Required latency in ms."
     )
-    parser.add_argument("--patience", type=int, default=7, help="Early stopping patience.")
+    parser.add_argument(
+        "--patience", type=int, default=7, help="Early stopping patience."
+    )
     return parser.parse_args()
 
 

@@ -8,10 +8,12 @@ from utils.losses import get_loss_function
 from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
 import argparse
+import intel_extension_for_pytorch as ipex
+import os
 import torch
 from torch import optim
 import torch.amp as amp
-import os
+
 
 
 def main(args):
@@ -158,6 +160,11 @@ def main(args):
     )
 
     scaler = amp.GradScaler(enabled=(device_obj.type == "cuda"))
+
+    # Tối ưu hóa với IPEX
+    if config.use_ipex:
+        print("Using Intel Extension for PyTorch (IPEX) for optimization...")
+        model, optimizer = ipex.optimize(model, optimizer)
 
     # Training loop
     patience = config.patience

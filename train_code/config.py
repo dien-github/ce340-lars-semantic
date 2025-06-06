@@ -1,5 +1,6 @@
 import glob
 import os
+import platform
 import torch
 from datetime import datetime
 
@@ -18,9 +19,11 @@ class Config:
     unfreeze_layers = ["classifier"]  # None, "backbone", "classifier", or "all"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     loss_type = "combined"  # cross_entropy, dice, or combined
-    ce_weight = 1.0  # Weight for cross-entropy loss
-    dice_weight = 1.0  # Weight for Dice loss
+    ce_weight = 1.0
+    dice_weight = 1.0 
     lap_weight = 0.5
+    cpu_info = platform.processor().lower()
+    use_ipex = "intel" in cpu_info
     cudnn_benchmark = True  # Set to True for speed if input sizes are fixed
 
     # dataset_path will be set by the command line argument
