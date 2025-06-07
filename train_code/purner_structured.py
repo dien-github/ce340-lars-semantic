@@ -77,11 +77,19 @@ def apply_structured_pruning_step(
     return model
 
 
+# def make_pruning_permanent(model):
+#    prune.remove(model, name="weight")
+#    torch.cuda.empty_cache()
+#    return model
+    
 def make_pruning_permanent(model):
-    prune.remove(model, name="weight")
+    # Duyệt qua tất cả các module con
+    for module in model.modules():
+        # Chỉ remove pruning với những module đã có mask
+        if isinstance(module, torch.nn.Conv2d) and hasattr(module, 'weight_mask'):
+            prune.remove(module, 'weight')
     torch.cuda.empty_cache()
     return model
-
 
 def collect_ignored_conv_layers(model, ignored_parent_modules):
     ignored = []
