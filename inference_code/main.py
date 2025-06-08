@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     FPS = total_file/total_time
     print("Average FPS: {:.3f}".format(FPS))
-    normFPS = FPS/10
+    normFPS = FPS/100
     f1 = eval_semantic_results(results, nc)
     score = 2*normFPS*f1/(normFPS + f1)
     print("F1: {:.3f}".format(f1))
