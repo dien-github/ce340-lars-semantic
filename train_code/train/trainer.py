@@ -4,7 +4,25 @@ import torch
 import torch.amp as amp
 
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None):
+def train_one_epoch(
+    model, dataloader, criterion, optimizer, device, scaler, epoch, scheduler=None
+):
+    """
+    Train the model for one epoch.
+
+    Args:
+        model (torch.nn.Module): Model to train.
+        dataloader (DataLoader): Training data loader.
+        criterion (nn.Module): Loss function.
+        optimizer (Optimizer): Optimizer.
+        device (torch.device): Device to use.
+        scaler (torch.cuda.amp.GradScaler): AMP scaler.
+        epoch (int): Current epoch number.
+        scheduler (Scheduler, optional): Learning rate scheduler.
+
+    Returns:
+        tuple: (epoch_time, epoch_loss)
+    """
     model.train()
     running_loss = 0.0
     loop = tqdm(
@@ -19,18 +37,12 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
 
         with amp.autocast(
             "cuda", enabled=(device.type == "cuda")
-        ):  # Automatic Mixed Precision
+        ):
             outputs = model(images)["out"]
             loss = criterion(outputs, masks)
 
-        # Scales loss. Calls backward() on scaled loss to create scaled gradients.
-        # For PyTorch >= 1.6, calls optimizer.zero_grad() internally if set_to_none=True
         scaler.scale(loss).backward()
-        # scaler.step() first unscales the gradients of the optimizer's assigned params.
-        # If these gradients do not contain infs or NaNs, optimizer.step() is then called.
-        # Otherwise, optimizer.step() is skipped.
         scaler.step(optimizer)
-        # Updates the scale for next iteration.
         scaler.update()
 
         if scheduler:
@@ -47,49 +59,45 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, scaler, epo
 
 def validate(model, dataloader, criterion, device, num_classes, epoch):
     """
-    Validate the model on the validation dataset.
-    Alternative validation with direct intersection/union accumulation.
+    Validate the model.
+
+    Args:
+        model (torch.nn.Module): Model to validate.
+        dataloader (DataLoader): Validation data loader.
+        criterion (nn.Module): Loss function.
+        device (torch.device): Device to use.
+        num_classes (int): Number of classes.
+        epoch (int): Current epoch number.
+
+    Returns:
+        tuple: (pixel_accuracy, mean_iou, epoch_val_loss)
     """
     model = model.to(device)
     model.eval()
     correct_pixels, total_pixels, running_val_loss = 0, 0, 0.0
     class_intersection = torch.zeros(num_classes, dtype=torch.long, device=device)
     class_union = torch.zeros(num_classes, dtype=torch.long, device=device)
-    # old
-    # iou_scores = [[] for _ in range(num_classes)]
 
     with torch.no_grad():
         loop = tqdm(dataloader, total=len(dataloader), desc=f"[Val] Epoch {epoch}")
         for images, masks in loop:
             images, masks = images.to(device), masks.to(device)
-            # Đảm bảo images là float32
             if images.dtype == torch.float16:
                 images = images.float()
-            # with amp.autocast("cuda", enabled=(device.type == "cuda")):
             outputs = model(images)["out"]
             loss = criterion(outputs, masks)
 
             _, predicted = torch.max(outputs, 1)
-
-            # Accumulate validation loss
             running_val_loss += loss.item() * images.size(0)
-
-            # Accumulate pixel accuracy
             total_pixels += masks.numel()
             correct_pixels += (predicted == masks).sum().item()
 
-            # Accumulate intersection and union for each class
             for cls in range(num_classes):
                 intersection = ((predicted == cls) & (masks == cls)).sum().item()
                 union = ((predicted == cls) | (masks == cls)).sum().item()
-
                 class_intersection[cls] += intersection
                 class_union[cls] += union
-                # old
-                # if union > 0:
-                #     iou_scores[cls].append(intersection / union)
 
-            # Calculate current mIoU for display
             current_ious = []
             for cls in range(num_classes):
                 if class_union[cls] > 0:
@@ -102,19 +110,13 @@ def validate(model, dataloader, criterion, device, num_classes, epoch):
             current_mIoU = np.mean([iou for iou in current_ious if iou > 0])
             loop.set_postfix(mIoU=f"{current_mIoU:.4f}")
 
-    # Cal culate final metrics
     pixel_accuracy = correct_pixels / total_pixels
 
-    # Calculate IoU for each class
     class_iou = []
     for cls in range(num_classes):
         if class_union[cls] > 0:
             class_iou.append(class_intersection[cls].item() / class_union[cls].item())
     mean_iou = np.mean(class_iou) if class_iou else 0.0
-
-
-    # old
-    # mean_iou = np.mean([np.mean(iou) if iou else 0 for iou in iou_scores])
 
     epoch_val_loss = running_val_loss / len(dataloader.dataset)
     print(

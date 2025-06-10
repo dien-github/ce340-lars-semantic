@@ -6,7 +6,6 @@ import numpy as np
 import torch
 import torch.amp as amp
 from torch.utils.data import DataLoader
-# from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -30,11 +29,7 @@ def get_test_data_paths(test_data_root):
     test_image_list_file = os.path.join(base_img_path, "image_list.txt")
 
     if not os.path.exists(test_image_list_file):
-        # Fallback if image_list.txt is not present, try to list files directly
-        # This assumes image names in images_dir correspond to mask names in masks_dir
-        print(
-            f"Warning: {test_image_list_file} not found. Trying to infer image list from directory."
-        )
+        print(f"Warning: {test_image_list_file} not found. Trying to infer image list from directory.")
         if os.path.exists(test_images_dir):
             image_files = [
                 f.split(".")[0]

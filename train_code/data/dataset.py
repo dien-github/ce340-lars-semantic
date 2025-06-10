@@ -49,8 +49,8 @@ class LaRSDataset(Dataset):
         if self.transform:
             augmented = self.transform(image=image_np, mask=mask_np)
             image_tensor = augmented['image']       # đã là torch.Tensor
-            mask_tensor = augmented['mask'].long()  # đảm bảo dtype = long
-        else:
+            mask_tensor = augmented['mask'].long()  
+            
             # Nếu không dùng Albumentations, fallback về ToTensor cho image, mask chỉ convert sang Tensor
             image_tensor = transforms.ToTensor()(image_pil)
             mask_tensor = torch.from_numpy(mask_np).long()

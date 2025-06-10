@@ -8,7 +8,7 @@ from utils.losses import get_loss_function
 from utils.plotting import save_metrics_plot, save_metrics_to_csv
 
 import argparse
-import intel_extension_for_pytorch as ipex
+# import intel_extension_for_pytorch as ipex
 import os
 import torch
 from torch import optim
@@ -17,20 +17,12 @@ import torch.amp as amp
 
 
 def main(args):
-    # Initialize Config with the dataset_path from arguments
-    # This ensures all paths within Config are correctly based on the runtime environment (e.g., Kaggle)
     config = Config(dataset_path_override=args.dataset_path)
 
     # Update config with command line arguments
     for key, value in vars(args).items():
         if value is not None and hasattr(config, key):
-            # print(f"Updating config: {key} = {value}") # dataset_path is already handled by __init__
             setattr(config, key, value)
-
-    # Paths are now properties of config and will use the calculated run_id and base_model_name
-    # best_model_path = config.best_model_path (example, used directly later)
-    # metrics_path = config.metrics_path (example, used directly later)
-    # plots_path = config.plots_path (example, used directly later)
 
     # Set random seeds for reproducibility
     torch.manual_seed(config.seed)
@@ -75,7 +67,6 @@ def main(args):
     if getattr(config, "load_checkpoint_path", None):
         print(f"Loading model from checkpoint: {config.load_checkpoint_path}")
         if os.path.exists(config.load_checkpoint_path):
-            # model.load_state_dict(torch.load(config.load_checkpoint_path, map_location=device_obj))
             state_dict = torch.load(
                 config.load_checkpoint_path, map_location=device_obj
             )
@@ -97,26 +88,13 @@ def main(args):
         print(f"Let's use {torch.cuda.device_count()} GPUs!")
         model = torch.nn.DataParallel(model)
 
-    model.to(
-        device_obj
-    )  # Ensure model is on the correct device after potentially wrapping with DataParallel
+    model.to(device_obj)
 
-    # Optionally compile model (PyTorch 2.0+)
-    # Note: torch.compile() with DataParallel might have some issues or specific behaviors.
-    # It's often recommended to use DistributedDataParallel for more complex scenarios with torch.compile.
-    # For simplicity with DataParallel, you might skip compilation or test thoroughly.
-    # If you encounter issues, consider disabling compile when using DataParallel for now.
     if args.compile_model and hasattr(torch, "compile") and device_obj.type == "cuda":
         if isinstance(model, torch.nn.DataParallel):
             print(
                 "torch.compile() with nn.DataParallel might have limitations. Proceeding with caution."
             )
-        # print("Attempting to compile the model with torch.compile()...")
-        # try:
-        #     model = torch.compile(model) # Compiling DataParallel(model)
-        #     print("Model compiled successfully.")
-        # except Exception as e:
-        #     print(f"Model compilation failed: {e}. Proceeding without compilation.")
         print(
             "Skipping torch.compile() when using nn.DataParallel for wider compatibility for now."
         )
@@ -138,12 +116,8 @@ def main(args):
         (p for p in model.parameters() if p.requires_grad), lr=config.learning_rate
     )
 
-    # Configure OneCycleLR using values from config or provide specific ones in Config class
-    # Ensure scheduler_epochs matches the actual number of training epochs
     scheduler_max_lr = getattr(config, "scheduler_max_lr", config.learning_rate)
-    scheduler_epochs = (
-        config.epochs
-    )  # Use config.epochs which might have been updated by args
+    scheduler_epochs = (config.epochs) 
     scheduler_pct_start = getattr(config, "scheduler_pct_start", 0.3)
     scheduler_div_factor = getattr(config, "scheduler_div_factor", 100.0)
     scheduler_final_div_factor = getattr(config, "scheduler_final_div_factor", 100.0)
@@ -161,10 +135,10 @@ def main(args):
 
     scaler = amp.GradScaler(enabled=(device_obj.type == "cuda"))
 
-    # Tối ưu hóa với IPEX
-    if config.use_ipex:
-        print("Using Intel Extension for PyTorch (IPEX) for optimization...")
-        model, optimizer = ipex.optimize(model, optimizer)
+    # # Tối ưu hóa với IPEX
+    # if config.use_ipex:
+    #     print("Using Intel Extension for PyTorch (IPEX) for optimization...")
+    #     model, optimizer = ipex.optimize(model, optimizer)
 
     # Training loop
     patience = config.patience
@@ -198,7 +172,6 @@ def main(args):
             best_miou = val_miou
             epochs_no_improve = 0
             os.makedirs(os.path.dirname(config.best_model_path), exist_ok=True)
-            # If using DataParallel, save the underlying model's state_dict
             if isinstance(model, torch.nn.DataParallel):
                 torch.save(model.module.state_dict(), config.best_model_path)
             else:
@@ -221,9 +194,7 @@ def main(args):
 
     # Ensure the best model was actually saved before trying to get its size
     if os.path.exists(config.best_model_path):
-        model_size = os.path.getsize(config.best_model_path) / (
-            1024 * 1024
-        )  # Size in MB
+        model_size = os.path.getsize(config.best_model_path) / (1024 * 1024)
     else:
         print(
             f"Warning: Best model path {config.best_model_path} not found. Size will be 0."
@@ -257,8 +228,8 @@ def main(args):
     os.makedirs(os.path.dirname(param_log_path), exist_ok=True)
 
     params = {
-        "run_id": config.run_id,  # Access property to ensure it's calculated
-        "base_model_name": config.base_model_name,  # Access property
+        "run_id": config.run_id,
+        "base_model_name": config.base_model_name,
         "model_type": model_name,
         "num_classes": config.num_classes,
         "input_size": config.input_size,
@@ -267,7 +238,7 @@ def main(args):
         "learning_rate": config.learning_rate,
         "optimizer": "Adam",
         "scheduler": "OneCycleLR",
-        "scheduler_params": {  # Log the actual scheduler parameters used
+        "scheduler_params": {
             "max_lr": scheduler_max_lr,
             "steps_per_epoch": len(train_loader),
             "epochs": scheduler_epochs,
@@ -327,7 +298,6 @@ if __name__ == "__main__":
         choices=["cross_entropy", "dice", "combined"],
         help="Type of loss function to use",
     )
-    # Add an argument for model compilation if you want to control it
     parser.add_argument(
         "--compile_model",
         action="store_true",

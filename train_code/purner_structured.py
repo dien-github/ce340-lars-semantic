@@ -22,6 +22,20 @@ def apply_structured_pruning_step(
     ignored_layers=None,
     importance_measure="L1",
 ):
+    """
+    Apply one step of structured pruning to the model.
+
+    Args:
+        model (torch.nn.Module): The model to prune.
+        channel_pruning_ratio (float): Ratio of filters to prune (0 < ratio < 1).
+        example_inputs (torch.Tensor): Example input tensor for tracing.
+        device (torch.device): Device to move the model to after pruning.
+        ignored_layers (list, optional): List of layers to ignore during pruning.
+        importance_measure (str, optional): Importance criterion ("L1", "L2", "Random").
+
+    Returns:
+        torch.nn.Module: The pruned model.
+    """
     if not (0 < channel_pruning_ratio < 1):
         print("channel_pruning_ratio is out of (0,1), skipping pruning step.")
         return model
@@ -468,7 +482,7 @@ def prune_main(args):
         print(
             f"Metrics for iteration {iteration_num} saved: CSV at {csv_path}, PNG at {plot_path}"
         )
-        
+
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
     model = model.to(device)
@@ -492,7 +506,9 @@ def prune_main(args):
     print(
         f"Final model: Pixel Acc={val_acc_final:.4f}, mIoU={miou_final:.4f}, Loss={val_loss_final:.4f}"
     )
-    final_name = f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
+    final_name = (
+        f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
+    )
     final_path, onnx_path, model_size_mb = export_and_save(
         model,
         example_inputs,

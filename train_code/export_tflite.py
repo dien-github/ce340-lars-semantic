@@ -8,6 +8,17 @@ import os
 def convert_saved_model_to_tflite(
     saved_model_dir, tflite_output_path, opset="TFLITE_BUILTINS"
 ):
+    """
+    Convert a TensorFlow SavedModel to TFLite format.
+
+    Args:
+        saved_model_dir (str): Path to the SavedModel directory.
+        tflite_output_path (str): Path to save the .tflite file.
+        opset (str, optional): TFLite opset to use ("TFLITE_BUILTINS" or "SELECT_TF_OPS").
+
+    Returns:
+        None
+    """
     converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
     if opset == "TFLITE_BUILTINS":
         converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]

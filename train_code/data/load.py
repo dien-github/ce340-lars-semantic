@@ -4,11 +4,9 @@ from data.dataset import LaRSDataset
 from data.augmentation import get_training_augmentations, get_validation_augmentations
 
 def load_datasets(config):
-    # Take transforms for train and val
     train_transforms = get_training_augmentations(target_size=config.input_size)
     val_transforms = get_validation_augmentations(target_size=config.input_size)
 
-    # Create datasets
     train_dataset = LaRSDataset(
         image_dir=config.train_dataset_path,
         image_names=config.train_names, # Use property from config

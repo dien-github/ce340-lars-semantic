@@ -6,6 +6,10 @@ from datetime import datetime
 
 
 class Config:
+    """
+    Configuration class for training, validation, and pruning.
+    """
+
     seed = 2025
     num_classes = 3
     batch_size = 32
@@ -20,7 +24,7 @@ class Config:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     loss_type = "combined"  # cross_entropy, dice, or combined
     ce_weight = 1.0
-    dice_weight = 1.0 
+    dice_weight = 1.0
     lap_weight = 0.5
     cpu_info = platform.processor().lower()
     use_ipex = "intel" in cpu_info
@@ -34,17 +38,33 @@ class Config:
         # Allow overriding dataset_path, primarily for Kaggle/Colab environments
         # If not overridden, it will try to use a default or expect it to be set by args later.
         # For your Kaggle case, main.py will set this.
-        self.dataset_path = dataset_path_override if dataset_path_override else "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset" # Default local path
+        self.dataset_path = (
+            dataset_path_override
+            if dataset_path_override
+            else "/home/grace/Documents/ce340-lars-semantic/LaRS_dataset"
+        )  # Default local path
 
         # Update paths to be relative to self.dataset_path
-        self.val_dataset_path = os.path.join(self.dataset_path, "lars_v1.0.0_images", "val", "images")
-        self.train_dataset_path = os.path.join(self.dataset_path, "lars_v1.0.0_images", "train", "images")
+        self.val_dataset_path = os.path.join(
+            self.dataset_path, "lars_v1.0.0_images", "val", "images"
+        )
+        self.train_dataset_path = os.path.join(
+            self.dataset_path, "lars_v1.0.0_images", "train", "images"
+        )
 
-        self.val_mask_path = os.path.join(self.dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks")
-        self.train_mask_path = os.path.join(self.dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks")
+        self.val_mask_path = os.path.join(
+            self.dataset_path, "lars_v1.0.0_annotations", "val", "semantic_masks"
+        )
+        self.train_mask_path = os.path.join(
+            self.dataset_path, "lars_v1.0.0_annotations", "train", "semantic_masks"
+        )
 
-        self.train_image_list_file = os.path.join(self.dataset_path, "lars_v1.0.0_images", "train", "image_list.txt")
-        self.val_image_list_file = os.path.join(self.dataset_path, "lars_v1.0.0_images", "val", "image_list.txt")
+        self.train_image_list_file = os.path.join(
+            self.dataset_path, "lars_v1.0.0_images", "train", "image_list.txt"
+        )
+        self.val_image_list_file = os.path.join(
+            self.dataset_path, "lars_v1.0.0_images", "val", "image_list.txt"
+        )
 
         self.date_str = datetime.now().strftime("%Y%m%d")
         self._run_id = None
@@ -56,7 +76,9 @@ class Config:
     def run_id(self):
         if self._run_id is None:
             checkpoint_dir = f"checkpoints/train/{self.date_str}"
-            os.makedirs(checkpoint_dir, exist_ok=True)  # Ensure dir exists before globbing
+            os.makedirs(
+                checkpoint_dir, exist_ok=True
+            )  # Ensure dir exists before globbing
             pattern = os.path.join(checkpoint_dir, f"best_model_{self.date_str}_*.pth")
             files = glob.glob(pattern)
             ids = []
@@ -65,10 +87,20 @@ class Config:
                 # Example: best_model_20240528_1.pth
                 parts = base.replace(".pth", "").split("_")
                 # Expecting format: best_model_YYYYMMDD_ID.pth
-                if len(parts) == 4 and parts[0] == "best" and parts[1] == "model" and parts[2] == self.date_str and parts[3].isdigit():
+                if (
+                    len(parts) == 4
+                    and parts[0] == "best"
+                    and parts[1] == "model"
+                    and parts[2] == self.date_str
+                    and parts[3].isdigit()
+                ):
                     ids.append(int(parts[3]))
-                elif len(parts) >= 3 and parts[-1].isdigit(): # Fallback for potentially older naming
-                    print(f"Warning: Found model with non-standard name: {base}. Attempting to parse ID.")
+                elif (
+                    len(parts) >= 3 and parts[-1].isdigit()
+                ):  # Fallback for potentially older naming
+                    print(
+                        f"Warning: Found model with non-standard name: {base}. Attempting to parse ID."
+                    )
                     ids.append(int(parts[-1]))
             self._run_id = max(ids, default=0) + 1
         return self._run_id
@@ -118,7 +150,9 @@ class Config:
     def train_names(self):
         if self._train_names is None:
             if not os.path.exists(self.train_image_list_file):
-                raise FileNotFoundError(f"Train image list file not found: {self.train_image_list_file}")
+                raise FileNotFoundError(
+                    f"Train image list file not found: {self.train_image_list_file}"
+                )
             with open(self.train_image_list_file, encoding="utf-8") as f:
                 self._train_names = [line.strip() for line in f]
         return self._train_names
@@ -127,7 +161,9 @@ class Config:
     def val_names(self):
         if self._val_names is None:
             if not os.path.exists(self.val_image_list_file):
-                raise FileNotFoundError(f"Validation image list file not found: {self.val_image_list_file}")
+                raise FileNotFoundError(
+                    f"Validation image list file not found: {self.val_image_list_file}"
+                )
             with open(self.val_image_list_file, encoding="utf-8") as f:
                 self._val_names = [line.strip() for line in f]
         return self._val_names
