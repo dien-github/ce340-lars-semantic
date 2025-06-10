@@ -1,13 +1,9 @@
 import argparse
-# import intel_extension_for_pytorch as ipex
 import os
 import torch
-import torch.nn as nn
-# import torch_pruning as tp
-import torch.nn.utils.prune as prune
+import torch_pruning as tp
 from torch.utils.data import DataLoader
 
-# from torchinfo import summary
 from model.deeplab import get_lraspp_model
 from config import Config
 from train.trainer import validate, train_one_epoch
@@ -18,69 +14,45 @@ from utils.plotting import save_metrics_plot, save_metrics_to_csv
 from test_model import get_test_data_paths, evaluate_model, summarize_results
 
 
-# def apply_structured_pruning_step(
-#     model,
-#     channel_pruning_ratio,
-#     example_inputs,
-#     device,
-#     ignored_layers=None,
-#     importance_measure="L1",
-# ):
-#     if not (0 < channel_pruning_ratio < 1):
-#         print("channel_pruning_ratio is out of (0,1), skipping pruning step.")
-#         return model
-#     model_cpu = model.cpu()
-#     example_inputs_cpu = example_inputs.cpu()
-#     if importance_measure == "L1":
-#         imp = tp.importance.MagnitudeImportance(p=1)
-#     elif importance_measure == "L2":
-#         imp = tp.importance.MagnitudeImportance(p=2)
-#     elif importance_measure == "Random":
-#         imp = tp.importance.RandomImportance()
-#     else:
-#         raise ValueError(f"Unsupported importance_measure: {importance_measure}")
-#     pruner = tp.pruner.MagnitudePruner(
-#         model=model_cpu,
-#         example_inputs=example_inputs_cpu,
-#         importance=imp,
-#         pruning_ratio=channel_pruning_ratio,
-#         ignored_layers=ignored_layers or [],
-#     )
-#     # for module in model.backbone.modules():
-#     #     if isinstance(module, torch.nn.Conv2d):
-#     #         prune.ln_structured(module, name="weight", amount=0.2, n=2, dim=0)
-
-#     print(
-#         f"Applying structured pruning: global filter ratio = {channel_pruning_ratio:.4f}"
-#     )
-#     pruner.step()
-#     return model_cpu.to(device)
-
-
 def apply_structured_pruning_step(
-    model, ignored_layers, channel_pruning_ratio, importance_measure=2
+    model,
+    channel_pruning_ratio,
+    example_inputs,
+    device,
+    ignored_layers=None,
+    importance_measure="L1",
 ):
-    for module in model.backbone.modules():
-        if isinstance(module, torch.nn.Conv2d):
-            if ignored_layers is not None and module in ignored_layers:
-                continue
-            prune.ln_structured(
-                module,
-                name="weight",
-                amount=channel_pruning_ratio,
-                n=importance_measure,
-                dim=0,
-            )
+    if not (0 < channel_pruning_ratio < 1):
+        print("channel_pruning_ratio is out of (0,1), skipping pruning step.")
+        return model
+    model_cpu = model.cpu()
+    example_inputs_cpu = example_inputs.cpu()
+    if importance_measure == "L1":
+        imp = tp.importance.MagnitudeImportance(p=1)
+    elif importance_measure == "L2":
+        imp = tp.importance.MagnitudeImportance(p=2)
+    elif importance_measure == "Random":
+        imp = tp.importance.RandomImportance()
+    else:
+        raise ValueError(f"Unsupported importance_measure: {importance_measure}")
+    pruner = tp.pruner.MagnitudePruner(
+        model=model_cpu,
+        example_inputs=example_inputs_cpu,
+        importance=imp,
+        pruning_ratio=channel_pruning_ratio,
+        ignored_layers=ignored_layers or [],
+    )
     print(
         f"Applying structured pruning: global filter ratio = {channel_pruning_ratio:.4f}"
     )
-    return model
+    pruner.step()
+    return model_cpu.to(device)
 
 
 def make_pruning_permanent(model):
-    prune.remove(model, name="weight")
+    model_cpu = model.cpu()
     torch.cuda.empty_cache()
-    return model
+    return model_cpu
 
 
 def collect_ignored_conv_layers(model, ignored_parent_modules):
@@ -92,67 +64,7 @@ def collect_ignored_conv_layers(model, ignored_parent_modules):
     return ignored
 
 
-def calculate_effective_params(model):
-    effective_params = 0
-    for name, module in model.named_modules():
-        if isinstance(module, torch.nn.Conv2d) and hasattr(module, "weight_mask"):
-            # Lấy mặt nạ của trọng số
-            mask = module.weight_mask
-            # Đếm số bộ lọc không bị tỉa (tổng số hàng khác 0 trong mask)
-            num_active_filters = mask.sum(dim=(1, 2, 3)).nonzero().size(0)
-            # Kích thước mỗi bộ lọc
-            filter_size = (
-                mask.size(1) * mask.size(2) * mask.size(3)
-            )  # in_channels * kh * kw
-            # Tham số hiệu quả cho tầng này
-            effective_params += num_active_filters * filter_size
-            # Cộng thêm bias nếu có và không bị tỉa
-            if module.bias is not None:
-                effective_params += module.bias.numel()
-        elif hasattr(module, "weight") and not hasattr(module, "weight_mask"):
-            # Các tham số không bị tỉa (ví dụ: Linear layers, bias của các tầng không tỉa)
-            effective_params += module.weight.numel()
-            if module.bias is not None:
-                effective_params += module.bias.numel()
-    return effective_params
-
-
-def calculate_effective_macs(model, input_size, device):
-    macs = 0
-    # Forward pass để lấy kích thước đầu ra
-    model.eval()
-    example_inputs = torch.randn(1, 3, *input_size).to(device)
-    with torch.no_grad():
-        model(example_inputs)
-    output_sizes = {}
-
-    def get_output_size(name):
-        return output_sizes.get(name, (512, 512))
-
-    input_channels = example_inputs.size(1)  # Số channels đầu vào ban đầu
-    for name, module in model.named_modules():
-        if isinstance(module, nn.Conv2d):
-            output_h, output_w = get_output_size(name)
-            if hasattr(module, 'weight_mask'):
-                # Tầng đã pruning
-                mask = module.weight_mask
-                num_active_filters = mask.sum(dim=(1, 2, 3)).nonzero().size(0)
-                layer_macs = (num_active_filters * input_channels *
-                              module.weight.size(2) * module.weight.size(3) *
-                              output_h * output_w)
-            else:
-                # Tầng không pruning
-                layer_macs = (module.out_channels * input_channels *
-                              module.weight.size(2) * module.weight.size(3) *
-                              output_h * output_w)
-                input_channels = module.out_channels
-            macs += layer_macs
-            input_channels = num_active_filters if hasattr(module, 'weight_mask') else module.out_channels
-    return macs
-
-
 def finetune(
-    args,
     model,
     config,
     epochs,
@@ -173,9 +85,9 @@ def finetune(
     )
     train_loader = DataLoader(
         train_dataset,
-        batch_size=args.batch_size,
+        batch_size=config.batch_size,
         shuffle=True,
-        num_workers=args.num_workers,
+        num_workers=getattr(config, "num_workers", 4),
         pin_memory=(device.type == "cuda"),
     )
     optimizer = torch.optim.Adam(
@@ -203,14 +115,8 @@ def finetune(
     session_val_accuracies, session_val_mious = [], []
     best_miou_finetune = -1.0
     epochs_no_improve = 0
-    patience = args.patience if hasattr(args, "patience") else 7
+    patience = getattr(config, "patience", 10)
     path_to_best_model_saved_this_finetune = None
-
-    # Tối ưu hóa với IPEX
-    # if config.use_ipex:
-    #     print("Using Intel Extension for PyTorch (IPEX) for optimization...")
-    #     model, optimizer = ipex.optimize(model, optimizer)
-
     for epoch in range(1, epochs + 1):
         actual_epoch_num = current_epoch_offset + epoch
         time_taken, train_loss = train_one_epoch(
@@ -323,7 +229,6 @@ def test_and_report(model, config, args, final_name, device, base_save_dir):
         pin_memory=True if device.type == "cuda" else False,
     )
     print(f"Test dataset loaded: {len(test_dataset)} images.")
-    
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Total number of parameters in the model: {num_params:,}")
     (
@@ -359,7 +264,6 @@ def prune_main(args):
     for key, value in vars(args).items():
         if value is not None and hasattr(config, key):
             setattr(config, key, value)
-
     device = torch.device(config.device)
     model_path = args.model
     if not model_path or not os.path.exists(model_path):
@@ -368,7 +272,6 @@ def prune_main(args):
     model = get_lraspp_model(num_classes=config.num_classes, device=device)
     for p in model.parameters():
         p.requires_grad = True
-
     print(f"Loading model from: {model_path} ...")
     state_dict = torch.load(model_path, map_location=device)
     new_state_dict = {
@@ -381,13 +284,8 @@ def prune_main(args):
         print(f"[Warning] Unexpected keys: {unexpected}")
     print("Model loaded successfully.")
     model = model.to(device)
-
-    # Calculate the parameter and FLOP
-    # info = summary(model, input_size=(1, 3, *config.input_size), verbose=0)
-    base_macs = calculate_effective_macs(model, config.input_size, device)
-    base_params = calculate_effective_params(model)
-
-    # Prepare the validation datsset
+    example_inputs = torch.randn(1, 3, *config.input_size).to(device)
+    base_macs, base_nparams = tp.utils.count_ops_and_params(model, example_inputs)
     val_transform = get_validation_augmentations(target_size=config.input_size)
     val_dataset = LaRSDataset(
         image_dir=config.val_dataset_path,
@@ -398,12 +296,11 @@ def prune_main(args):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=args.batch_size,
+        batch_size=config.batch_size,
         shuffle=False,
-        num_workers=args.num_workers,
+        num_workers=getattr(config, "num_workers", 4),
         pin_memory=(device.type == "cuda"),
     )
-
     criterion = get_loss_function(
         config.loss_type,
         num_classes=config.num_classes,
@@ -411,28 +308,19 @@ def prune_main(args):
         dice_weight=config.dice_weight,
         lap_weight=config.lap_weight,
     ).to(device)
-
     print("Validating model before pruning ...")
     val_acc_before, miou_before, val_loss_before = validate(
         model, val_loader, criterion, device, config.num_classes, epoch=0
     )
-
     print("=== Before pruning ===")
-    print(f"MACs={base_macs / 1e9:.4f}G, Params={base_params / 1e6:.4f}M")
+    print(f"MACs={base_macs / 1e9:.4f}G, Params={base_nparams / 1e6:.4f}M")
     print(
         f"Pixel Acc={val_acc_before:.4f}, mIoU={miou_before:.4f}, Loss={val_loss_before:.4f}"
     )
-
     ignored_parent_modules = []
     if hasattr(model, "classifier"):
         ignored_parent_modules.append(model.classifier)
-    # WARNINGhrome
-    # This block just use for LRASPP + MobileNetV3
-    ignored_parent_modules.append(model.backbone['0'])
-    ignored_parent_modules.append(model.backbone['16'])
-    #
     ignored_layers = collect_ignored_conv_layers(model, ignored_parent_modules)
-
     prunable_layers = []
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.Conv2d) and module not in ignored_layers:
@@ -445,14 +333,12 @@ def prune_main(args):
         )
         return
     print(f"Found {len(prunable_layers)} Conv2d layers to prune.")
-
     R_total = args.target_prune_rate
     N_steps = args.iterative_steps
     if N_steps > 0 and 0 < R_total < 1:
         r_step = 1.0 - (1.0 - R_total) ** (1.0 / N_steps)
     else:
         r_step = 0.0
-
     print(f"Target overall prune rate: {R_total:.4f}")
     print(f"Iterative steps: {N_steps}")
     print(f"→ Prune rate per step: {r_step:.4f}")
@@ -480,14 +366,16 @@ def prune_main(args):
         model = apply_structured_pruning_step(
             model=model,
             channel_pruning_ratio=r_step,
+            example_inputs=example_inputs,
+            device=device,
             ignored_layers=ignored_layers,
-            importance_measure=2,
+            importance_measure="L1",
         )
-        # info = summary(model, input_size=(1, 3, *config.input_size), verbose=0)
-        current_macs = calculate_effective_macs(model, config.input_size, device)
-        current_params = calculate_effective_params(model)
+        current_macs, current_params = tp.utils.count_ops_and_params(
+            model, example_inputs
+        )
         reduced_params = (
-            (base_params - current_params) / base_params if base_params > 0 else 0.0
+            (base_nparams - current_params) / base_nparams if base_nparams > 0 else 0.0
         )
         reduced_macs = (base_macs - current_macs) / base_macs if base_macs > 0 else 0.0
         print(
@@ -504,7 +392,6 @@ def prune_main(args):
             iter_val_mious,
             path_to_best_model_this_iter_finetune,
         ) = finetune(
-            args=args,
             model=model,
             config=config,
             epochs=args.epochs,
@@ -581,22 +468,17 @@ def prune_main(args):
         print(
             f"Metrics for iteration {iteration_num} saved: CSV at {csv_path}, PNG at {plot_path}"
         )
-
+        
     print("\n========== Finalizing pruning ==========")
     model = make_pruning_permanent(model)
-
     model = model.to(device)
-    # model_cpu = model.cpu()
-    # example_inputs_cpu = example_inputs.cpu()
-
-    # info = summary(model_cpu, input_size=(1, 3, *config.input_size), verbose=0)
-    final_macs = calculate_effective_macs(model, config.input_size, device)
-    final_params = calculate_effective_params(model)
-    # final_macs, final_params = tp.utils.count_ops_and_params(
-    #     model_cpu, example_inputs_cpu
-    # )
+    model_cpu = model.cpu()
+    example_inputs_cpu = example_inputs.cpu()
+    final_macs, final_params = tp.utils.count_ops_and_params(
+        model_cpu, example_inputs_cpu
+    )
     final_param_reduction = (
-        (base_params - final_params) / base_params if base_params > 0 else 0.0
+        (base_nparams - final_params) / base_nparams if base_nparams > 0 else 0.0
     )
     final_mac_reduction = (base_macs - final_macs) / base_macs if base_macs > 0 else 0.0
     print(
@@ -610,10 +492,7 @@ def prune_main(args):
     print(
         f"Final model: Pixel Acc={val_acc_final:.4f}, mIoU={miou_final:.4f}, Loss={val_loss_final:.4f}"
     )
-    final_name = (
-        f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
-    )
-    example_inputs = torch.randn(1, 3, *config.input_size).to(device)
+    final_name = f"pruned_final_paramRed_{final_param_reduction:.2f}_miou_{miou_final:.3f}.pth"
     final_path, onnx_path, model_size_mb = export_and_save(
         model,
         example_inputs,
