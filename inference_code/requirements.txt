@@ -1,6 +1,0 @@
-matplotlib
-numpy>2
-Pillow
-torch
-torchvision
-scikit-learn
